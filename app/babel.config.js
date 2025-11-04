@@ -3,11 +3,10 @@ module.exports = function(api) {
   return {
     presets: ['babel-preset-expo'],
     plugins: [
-        'react-native-reanimated/plugin', // siempre al final
-        '@babel/plugin-proposal-optional-chaining', // agrega esta línea
-        '@babel/plugin-proposal-nullish-coalescing-operator',
-        '@babel/plugin-transform-template-literals', // <-- agrega esta línea
-
+      '@babel/plugin-transform-optional-chaining',
+      '@babel/plugin-transform-nullish-coalescing-operator', 
+      '@babel/plugin-transform-template-literals',
+      'react-native-reanimated/plugin', // siempre al final
     ],
   };
 };

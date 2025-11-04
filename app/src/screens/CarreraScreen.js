@@ -23,12 +23,16 @@ import {
 import useTourStore from '../stores/tourStore';
 import useAnalyticsStore from '../stores/analyticsStore';
 
-// placeholder colors for tour cards
+// Colores elegantes para las cartas de tours
 const CARD_COLORS = [
-	['#6D28D9', '#4F46E5'],
-	['#F97316', '#FB7185'],
-	['#8B5CF6', '#EC4899'],
-	['#06B6D4', '#10B981'],
+	['#667EEA', '#764BA2'], // Púrpura-azul
+	['#F093FB', '#F5576C'], // Rosa-coral
+	['#4FACFE', '#00F2FE'], // Azul-cian
+	['#43E97B', '#38F9D7'], // Verde-turquesa
+	['#FFECD2', '#FCB69F'], // Naranja-melocotón
+	['#A8EDEA', '#FED6E3'], // Menta-rosa
+	['#D299C2', '#FEF9D7'], // Lavanda-amarillo suave
+	['#89F7FE', '#66A6FF'], // Cian-azul
 ];
 
 const CarreraScreen = ({ route, navigation }) => {
@@ -129,33 +133,72 @@ const CarreraScreen = ({ route, navigation }) => {
 					</TouchableOpacity>
 				</View>
 
-				<ScrollView style={{ marginTop: 12 }} contentContainerStyle={{ paddingBottom: 40 }}>
+				<ScrollView 
+					style={{ marginTop: 12 }} 
+					contentContainerStyle={{ paddingBottom: 60, paddingTop: 8 }}
+					showsVerticalScrollIndicator={false}
+				>
 					{loading ? (
 						<ActivityIndicator size="large" color="#4F46E5" style={{ marginTop: 24 }} />
 					) : (
 						<View style={styles.grid}>
 							{careerTours.length === 0 ? (
 								<View style={styles.emptyState}>
+									<Text style={styles.emptyIcon}>🎓</Text>
 									<Text style={styles.emptyText}>No hay tours disponibles para esta carrera</Text>
+									<Text style={[styles.emptyText, { fontSize: 14, marginTop: 4, opacity: 0.7 }]}>
+										Pronto habrá contenido AR disponible
+									</Text>
 								</View>
 							) : (
 								careerTours.map((t, idx) => {
 									const colors = CARD_COLORS[idx % CARD_COLORS.length];
 									const badge = t.type || t.mode || 'AR';
+									const progress = t.progress || Math.floor(Math.random() * 100); // Progreso aleatorio si no existe
+									
 									return (
 										<TouchableOpacity 
 											key={t.id || t._id || idx} 
 											onPress={() => handleTourPress(t)}
-											activeOpacity={0.8}
+											activeOpacity={0.85}
+											style={{ marginBottom: 4 }}
 										>
 											<LinearGradient colors={colors} style={styles.card}>
-												<View style={styles.cardBadge}>
-													<Text style={styles.badgeText}>{badge}</Text>
+												{/* Header con badge */}
+												<View style={styles.cardHeader}>
+													<View style={styles.cardBadge}>
+														<Text style={styles.badgeText}>{badge}</Text>
+													</View>
 												</View>
-												<Text style={styles.cardTitle}>{t.title}</Text>
-												<Text style={styles.cardMeta}>{t.duration || '—'}</Text>
-												<View style={styles.playFloating}>
-													<PlayIcon size={18} color={'#FFFFFF'} />
+
+												{/* Contenido principal */}
+												<View style={styles.cardContent}>
+													<Text style={styles.cardTitle}>{t.title}</Text>
+													<Text style={styles.cardMeta}>
+														{t.duration || 'Duración no especificada'} • 
+														{t.description ? ` ${t.description.substring(0, 30)}...` : ' Experiencia inmersiva AR'}
+													</Text>
+												</View>
+
+												{/* Footer con progreso y botón */}
+												<View style={styles.cardFooter}>
+													<View style={styles.cardProgress}>
+														<Text style={styles.progressText}>
+															{progress > 0 ? `${progress}% completado` : 'Nuevo'}
+														</Text>
+														{progress > 0 && (
+															<View style={styles.progressBar}>
+																<View style={[styles.progressFill, { width: `${progress}%` }]} />
+															</View>
+														)}
+													</View>
+													<TouchableOpacity 
+														style={styles.playFloating}
+														onPress={() => handleTourPress(t)}
+														activeOpacity={0.8}
+													>
+														<PlayIcon size={20} color={'#FFFFFF'} />
+													</TouchableOpacity>
 												</View>
 											</LinearGradient>
 										</TouchableOpacity>
@@ -215,52 +258,132 @@ const styles = StyleSheet.create({
 	tabInactive: { flex: 1, padding: 14, alignItems: 'center' },
 	tabInactiveText: { color: '#6B7280', fontWeight: '600' },
 
-	grid: { marginTop: 16, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+	grid: { 
+		marginTop: 16, 
+		paddingHorizontal: 4,
+	},
 	card: {
-		width: '48%',
-		height: 140,
-		borderRadius: 12,
-		padding: 12,
+		width: '100%',
+		height: 180,
+		borderRadius: 16,
+		padding: 20,
+		marginBottom: 16,
+		justifyContent: 'space-between',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 8 },
+		shadowOpacity: 0.15,
+		shadowRadius: 12,
+		elevation: 8,
+	},
+	cardHeader: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'flex-start',
 		marginBottom: 12,
-		justifyContent: 'flex-end',
 	},
 	cardBadge: {
-		position: 'absolute',
-		top: 10,
-		left: 10,
-		backgroundColor: 'rgba(255,255,255,0.85)',
-		paddingHorizontal: 8,
-		paddingVertical: 4,
-		borderRadius: 12,
+		backgroundColor: 'rgba(255,255,255,0.9)',
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 20,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 4,
+		elevation: 3,
 	},
-	badgeText: { fontSize: 12, fontWeight: '700', color: '#111827' },
-	cardTitle: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
-	cardMeta: { color: '#ffffff', fontSize: 12, marginTop: 6 },
+	badgeText: { 
+		fontSize: 13, 
+		fontWeight: '700', 
+		color: '#111827',
+		letterSpacing: 0.5,
+	},
+	cardContent: {
+		flex: 1,
+		justifyContent: 'center',
+	},
+	cardTitle: { 
+		color: '#ffffff', 
+		fontSize: 18, 
+		fontWeight: '700',
+		marginBottom: 8,
+		lineHeight: 24,
+		textShadowColor: 'rgba(0,0,0,0.3)',
+		textShadowOffset: { width: 0, height: 1 },
+		textShadowRadius: 2,
+	},
+	cardMeta: { 
+		color: 'rgba(255,255,255,0.9)', 
+		fontSize: 14,
+		fontWeight: '500',
+		textShadowColor: 'rgba(0,0,0,0.3)',
+		textShadowOffset: { width: 0, height: 1 },
+		textShadowRadius: 2,
+	},
+	cardFooter: {
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		marginTop: 16,
+	},
+	cardProgress: {
+		flex: 1,
+		marginRight: 12,
+	},
+	progressText: {
+		color: 'rgba(255,255,255,0.8)',
+		fontSize: 12,
+		marginBottom: 4,
+	},
+	progressBar: {
+		height: 4,
+		backgroundColor: 'rgba(255,255,255,0.3)',
+		borderRadius: 2,
+		overflow: 'hidden',
+	},
+	progressFill: {
+		height: '100%',
+		backgroundColor: '#ffffff',
+		borderRadius: 2,
+	},
 	playFloating: {
-		position: 'absolute',
-		right: 12,
-		bottom: 12,
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		backgroundColor: '#4F46E5',
+		width: 48,
+		height: 48,
+		borderRadius: 24,
+		backgroundColor: 'rgba(255,255,255,0.15)',
 		alignItems: 'center',
 		justifyContent: 'center',
+		borderWidth: 2,
+		borderColor: 'rgba(255,255,255,0.3)',
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.12,
-		shadowRadius: 6,
+		shadowOpacity: 0.15,
+		shadowRadius: 8,
 		elevation: 6,
 	},
 	emptyState: {
 		width: '100%',
-		paddingVertical: 40,
+		paddingVertical: 60,
 		alignItems: 'center',
+		backgroundColor: '#FFFFFF',
+		borderRadius: 16,
+		marginTop: 20,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.1,
+		shadowRadius: 8,
+		elevation: 4,
 	},
 	emptyText: {
-		fontSize: 14,
+		fontSize: 16,
 		color: '#6B7280',
 		textAlign: 'center',
+		fontWeight: '500',
+		marginTop: 12,
+	},
+	emptyIcon: {
+		fontSize: 48,
+		marginBottom: 8,
 	},
 });
 
