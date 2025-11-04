@@ -1,8 +1,11 @@
 // src/api/apiClient.js
 import { API_BASE_URL } from '../utils/constants';
 
+// Timeout por defecto (30s) — se puede sobrescribir por petición pasando { timeout }
+const DEFAULT_TIMEOUT = 30000;
+
 // Pequeña utilidad para timeout usando AbortController
-const timeoutFetch = (resource, options = {}, timeout = 10000) => {
+const timeoutFetch = (resource, options = {}, timeout = DEFAULT_TIMEOUT) => {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   const signal = controller.signal;
@@ -55,13 +58,13 @@ const createHttpError = (message, { response = null, request = null, config = nu
   return err;
 };
 
-const request = async (path, { method = 'GET', headers = {}, body = null, timeout = 10000 } = {}) => {
+const request = async (path, { method = 'GET', headers = {}, body = null, timeout = DEFAULT_TIMEOUT } = {}) => {
   const url = buildUrl(path);
   const finalHeaders = { ...defaultHeaders, ...headers };
 
-  const config = { url, method, headers: finalHeaders };
+  const config = { url, method, headers: finalHeaders, timeout };
 
-  console.log(`📤 API Request: ${method.toUpperCase()} ${url}`);
+  console.log(`📤 API Request: ${method.toUpperCase()} ${url} (timeout ${timeout}ms)`);
 
   const options = {
     method,

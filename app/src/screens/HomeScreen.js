@@ -15,6 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import {
   SearchIcon,
   HeartIcon,
@@ -30,6 +31,9 @@ import {
 import useCareerStore from '../stores/careerStore';
 import useTourStore from '../stores/tourStore';
 import useAnalyticsStore from '../stores/analyticsStore';
+import useHiddenStore from '../stores/hiddenStore';
+import apiClient from '../api/apiClient';
+import { ENDPOINTS } from '../utils/constants';
 
 const HomeScreen = ({ navigation }) => {
   const [searchText, setSearchText] = useState('');
@@ -82,8 +86,53 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const isLoading = careersLoading || toursLoading;
+  const [testimonios, setTestimonios] = useState([]);
+  const [testimoniosLoading, setTestimoniosLoading] = useState(false);
+
+  // Cargar testimonios
+  useEffect(() => {
+    let mounted = true;
+    const fetchTestimonios = async () => {
+      setTestimoniosLoading(true);
+      try {
+  const response = await apiClient.get(ENDPOINTS.TESTIMONIOS, { timeout: 30000 });
+        const data = Array.isArray(response.data) ? response.data : [];
+        if (mounted) setTestimonios(data);
+      } catch (err) {
+        console.error('Error cargando testimonios en HomeScreen:', err);
+        if (mounted) setTestimonios([]);
+      } finally {
+        if (mounted) setTestimoniosLoading(false);
+      }
+    };
+    fetchTestimonios();
+    return () => { mounted = false; };
+  }, []);
+
+  // Store de ocultos (sesión)
+  const hiddenTours = useHiddenStore((s) => s.hiddenTours);
+  const hiddenTestimonials = useHiddenStore((s) => s.hiddenTestimonials);
+  const hideTour = useHiddenStore((s) => s.hideTour);
+  const hideTestimonial = useHiddenStore((s) => s.hideTestimonial);
+
+  // Acciones visuales para swipe
+  const renderLeftActions = () => (
+    <View style={[styles.swipeAction, styles.swipeLeft]}>
+      <Text style={styles.swipeText}>Ocultar</Text>
+    </View>
+  );
+  const renderRightActions = () => (
+    <View style={[styles.swipeAction, styles.swipeRight]}>
+      <Text style={styles.swipeText}>Ocultar</Text>
+    </View>
+  );
+
+  // Filtrar según ocultos
+  const toursToRender = filteredTours.filter((t) => !hiddenTours.some((h) => h.id === t.id));
+  const testimoniosToRender = testimonios.filter((t) => !hiddenTestimonials.some((h) => h.id === t.id));
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       
@@ -97,15 +146,10 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.appName}>ExplorAR</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.notificationButton}>
-            <Image
-              source={require('../../assets/campana.svg')}
-              style={styles.notificationIcon}
-            />
-          </TouchableOpacity>
+          
           <TouchableOpacity style={styles.profileButton}>
             <Image
-              source={require('../../assets/mujer_perfil.png')}
+              source={require('../../assets/notificaciones.png')}
               style={styles.profileImage}
             />
           </TouchableOpacity>
@@ -192,41 +236,83 @@ const HomeScreen = ({ navigation }) => {
               <Text style={styles.sectionTitle}>Tours Recientes</Text>
             </View>
 
-            {filteredTours.length === 0 ? (
+            {toursToRender.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>
                   {searchText ? 'No se encontraron tours' : 'No hay tours disponibles'}
                 </Text>
               </View>
             ) : (
-              filteredTours.map((tour) => (
-                <TouchableOpacity key={tour.id} style={styles.tourCard}>
-                  <View style={styles.tourImageContainer}>
-                    <Image
-                      source={
-                        tour.image
-                          ? (typeof tour.image === 'string' ? { uri: tour.image } : tour.image)
-                          : { uri: 'https://img.icons8.com/color/96/courthouse.png' }
-                      }
-                      style={styles.tourImage}
-                    />
-                    <TouchableOpacity style={styles.playButton}>
-                      <PlayIcon size={12} />
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.tourInfo}>
-                    <Text style={styles.tourTitle}>{tour.title}</Text>
-                    <View style={styles.tourDetails}>
-                      <View style={styles.tourDuration}>
-                        <ClockIcon size={16} />
-                        <Text style={styles.durationText}>{tour.duration || '0 min'}</Text>
-                      </View>
-                      <View style={styles.progressContainer}>
-                        <View style={[styles.progressBar, { width: `${tour.progress || 0}%` }]} />
+              toursToRender.map((tour) => (
+                <Swipeable
+                  key={tour.id}
+                  renderLeftActions={renderLeftActions}
+                  renderRightActions={renderRightActions}
+                  onSwipeableOpen={() => hideTour(tour)}
+                >
+                  <TouchableOpacity style={styles.tourCard}>
+                    <View style={styles.tourImageContainer}>
+                      <Image
+                        source={
+                          tour.image
+                            ? (typeof tour.image === 'string' ? { uri: tour.image } : tour.image)
+                            : { uri: 'https://img.icons8.com/color/96/courthouse.png' }
+                        }
+                        style={styles.tourImage}
+                      />
+                      <TouchableOpacity style={styles.playButton}>
+                        <PlayIcon size={12} />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.tourInfo}>
+                      <Text style={styles.tourTitle}>{tour.title}</Text>
+                      <View style={styles.tourDetails}>
+                        <View style={styles.tourDuration}>
+                          <ClockIcon size={16} />
+                          <Text style={styles.durationText}>{tour.duration || '0 min'}</Text>
+                        </View>
+                        <View style={styles.progressContainer}>
+                          <View style={[styles.progressBar, { width: `${tour.progress || 0}%` }]} />
+                        </View>
                       </View>
                     </View>
+                  </TouchableOpacity>
+                </Swipeable>
+              ))
+            )}
+          </View>
+
+          {/* Testimonios Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Testimonios</Text>
+            </View>
+
+            {testimoniosLoading ? (
+              <ActivityIndicator size="small" color="#4F46E5" />
+            ) : testimoniosToRender.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No hay testimonios disponibles</Text>
+              </View>
+            ) : (
+              testimoniosToRender.slice(0, 5).map((t) => (
+                <Swipeable
+                  key={t.id}
+                  renderLeftActions={renderLeftActions}
+                  renderRightActions={renderRightActions}
+                  onSwipeableOpen={() => hideTestimonial(t)}
+                >
+                  <View style={styles.testimonialCard}>
+                    <Image
+                      source={t.authorImage ? (typeof t.authorImage === 'string' ? { uri: t.authorImage } : t.authorImage) : require('../../assets/homescreen.png')}
+                      style={styles.testimonialThumb}
+                    />
+                    <View style={styles.testimonialInfo}>
+                      <Text style={styles.testimonialName}>{t.author || t.autor || 'Anónimo'}</Text>
+                      <Text style={styles.testimonialText} numberOfLines={2}>{t.text}</Text>
+                    </View>
                   </View>
-                </TouchableOpacity>
+                </Swipeable>
               ))
             )}
           </View>
@@ -249,12 +335,19 @@ const HomeScreen = ({ navigation }) => {
           <ExploreIcon size={24} />
           <Text style={styles.navText}>Explorar</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => {
+            trackScreenView('Guardados');
+            navigation.navigate('Guardados');
+          }}
+        >
           <BookmarkIcon size={24} />
           <Text style={styles.navText}>Guardados</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
+    </GestureHandlerRootView>
   );
 };
 
@@ -523,6 +616,55 @@ const styles = StyleSheet.create({
   activeNavText: {
     color: '#4F46E5',
     fontWeight: '600',
+  },
+  /* Testimonios */
+  testimonialCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  testimonialThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    marginRight: 12,
+  },
+  testimonialInfo: {
+    flex: 1,
+  },
+  testimonialName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  testimonialText: {
+    fontSize: 13,
+    color: '#374151',
+  },
+  // Acciones de swipe
+  swipeAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 96,
+  },
+  swipeLeft: {
+    backgroundColor: '#F59E0B',
+  },
+  swipeRight: {
+    backgroundColor: '#EF4444',
+  },
+  swipeText: {
+    color: '#fff',
+    fontWeight: '700',
   },
 });
 

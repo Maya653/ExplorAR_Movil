@@ -14,25 +14,102 @@ app.use(cors());
 app.use(express.json());
 
 const uri = process.env.MONGODB_URI;
+
+// Si no hay URI, no abortamos: habilitamos un modo fallback en memoria
+// para que al menos /api/testimonios funcione y la app móvil pueda probarse.
 if (!uri) {
-  console.error('Error: MONGODB_URI no está definido en .env');
-  process.exit(1);
+  console.warn('⚠️  MONGODB_URI no está definido en .env. Iniciando en modo fallback en memoria para testimonios.');
 }
 
-console.log('🔄 Intentando conectar a MongoDB...');
-const client = new MongoClient(uri);
+const client = uri ? new MongoClient(uri) : null;
 
 async function startServer() {
+  let connected = false;
+  let db, coll, toursColl, testimoniosColl, analyticsColl;
+  if (client) {
+    try {
+      console.log('🔄 Intentando conectar a MongoDB...');
+      await client.connect();
+      console.log('✅ Conectado a MongoDB Atlas');
+      connected = true;
+
+      db = client.db('ExplorAR');
+      coll = db.collection('carreras');
+      toursColl = db.collection('tours');
+      testimoniosColl = db.collection('testimonios');
+      analyticsColl = db.collection('analytics'); // ✅ Nueva colección
+    } catch (err) {
+      console.error('❌ No se pudo conectar a MongoDB. Se iniciará el servidor en modo fallback:', err.message);
+      connected = false;
+    }
+  }
+
+  // Función de mapeo común para testimonios
+  const mapTestimonio = (t) => ({
+    id: (t._id || t.id || '').toString(),
+    author: t.author || t.autor || t.name || t.title || 'Anónimo',
+    authorImage: t.authorImage || t.autorimagen || t.imageUrl || null,
+    role: t.role || t.position || t.authorRole || '',
+    year: t.year || t.date || t.graduationYear || '',
+    text: t.text || t.testimonio || t.content || '',
+    _raw: t,
+  });
+
+  // Datos de ejemplo para modo fallback (en memoria)
+  const sampleTestimonios = [
+    {
+      _id: 'sample-1',
+      author: 'Ana Pérez',
+      authorImage: 'https://i.pravatar.cc/300?img=5',
+      role: 'Egresada de Mecatrónica',
+      year: '2022',
+      text: 'ExplorAR me ayudó a decidir mi carrera con una experiencia inmersiva y práctica.',
+      transcript: 'Transcripción breve del testimonio de Ana...',
+      mediaUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    },
+    {
+      _id: 'sample-2',
+      autor: 'Carlos López',
+      autorimagen: 'https://i.pravatar.cc/300?img=12',
+      position: 'Estudiante de Sistemas',
+      date: '2024',
+      testimonio: 'Los tours en AR son increíbles para entender los laboratorios del campus.',
+      videoUrl: 'https://youtu.be/aqz-KE-bpKQ',
+    },
+  ];
+
+  if (!connected) {
+    // Solo rutas mínimas necesarias para que la app funcione
+    app.get('/api/testimonios', async (req, res) => {
+      try {
+        console.log('📥 GET /api/testimonios (fallback)');
+        const mapped = sampleTestimonios.map(mapTestimonio);
+        console.log(`✅ Enviando ${mapped.length} testimonios (fallback)`);
+        return res.json(mapped);
+      } catch (err) {
+        console.error('❌ Error en GET /api/testimonios (fallback):', err);
+        return res.status(500).json({ error: 'Error interno del servidor (fallback)' });
+      }
+    });
+
+    // Health check
+    app.get('/health', (req, res) => {
+      console.log('💚 Health check (fallback)');
+      res.json({ ok: true, mode: 'fallback', timestamp: new Date().toISOString() });
+    });
+
+    const port = process.env.PORT || 5000;
+    app.listen(port, '0.0.0.0', () => {
+      console.log(`🚀 Servidor (fallback) corriendo en http://0.0.0.0:${port}`);
+      console.log(`📱 Para emulador Android: http://10.0.2.2:${port}`);
+      console.log(`📡 Endpoints disponibles (fallback):`);
+      console.log(`   - GET  /api/testimonios`);
+      console.log(`   - GET  /health`);
+    });
+    return; // No continuar definiendo rutas con DB
+  }
+
   try {
-    await client.connect();
-    console.log('✅ Conectado a MongoDB Atlas');
-
-    const db = client.db('ExplorAR');
-    const coll = db.collection('carreras');
-    const toursColl = db.collection('tours');
-    const testimoniosColl = db.collection('testimonios');
-    const analyticsColl = db.collection('analytics'); // ✅ Nueva colección
-
     // Logs de verificación
     try {
       const carrerasCount = await coll.countDocuments();
@@ -147,22 +224,30 @@ async function startServer() {
       }
     });
 
+    // ========== ENDPOINT: Modelo del tour (redirección a GLB público) ==========
+    app.get('/api/tours/:id/model', async (req, res) => {
+      try {
+        const { id } = req.params;
+        console.log(`📥 GET /api/tours/${id}/model`);
+
+        // Si tuvieras una URL específica en BD, podrías devolverla aquí.
+        // De momento, redirigimos a un GLB público estable como fallback.
+        const fallbackGlb = 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
+        return res.redirect(302, fallbackGlb);
+      } catch (err) {
+        console.error('❌ Error en GET /api/tours/:id/model:', err);
+        return res.status(500).json({ error: 'Error interno' });
+      }
+    });
+
     // ========== ENDPOINT: Testimonios ==========
     app.get('/api/testimonios', async (req, res) => {
       try {
         console.log('📥 GET /api/testimonios');
         const docs = await testimoniosColl.find({}).toArray();
-        
-        const mapped = docs.map(t => ({
-          id: t._id.toString(),
-          author: t.author || t.autor || t.name || t.title || 'Anónimo',
-          authorImage: t.authorImage || t.autorimagen || t.imageUrl || null,
-          role: t.role || t.position || '',
-          year: t.year || t.date || '',
-          text: t.text || t.testimonio || t.content || '',
-          _raw: t,
-        }));
-        
+        // Orden opcional por fecha si existe
+        // const docs = await testimoniosColl.find({}).sort({ createdAt: -1 }).toArray();
+        const mapped = docs.map(mapTestimonio);
         console.log(`✅ Enviando ${mapped.length} testimonios`);
         return res.json(mapped);
       } catch (err) {
@@ -270,7 +355,6 @@ async function startServer() {
   app.listen(port, '0.0.0.0', () => {
     console.log(`🚀 Servidor corriendo en http://0.0.0.0:${port}`);
     console.log(`📱 Para emulador Android: http://10.0.2.2:${port}`);
-    console.log(`📱 Para dispositivo físico: http://100.100.1.157:${port}`);
     console.log(`📡 Endpoints disponibles:`);
     console.log(`   - GET  /api/carreras`);
     console.log(`   - GET  /api/tours`);
@@ -281,15 +365,29 @@ async function startServer() {
   });
   } catch (err) {
     console.error('❌ Error iniciando servidor:', err);
-    process.exit(1);
+    // Si algo falla aquí, intentamos al menos exponer fallback de testimonios
+    try {
+      console.warn('🔁 Intentando iniciar servidor en modo fallback mínimo...');
+      app.get('/api/testimonios', (req, res) => res.json(sampleTestimonios.map(mapTestimonio)));
+      app.get('/health', (req, res) => res.json({ ok: true, mode: 'fallback-error', timestamp: new Date().toISOString() }));
+      const port = process.env.PORT || 5000;
+      app.listen(port, '0.0.0.0', () => {
+        console.log(`🚀 Servidor (fallback-error) corriendo en http://0.0.0.0:${port}`);
+      });
+    } catch (e) {
+      console.error('⛔ No fue posible iniciar ni siquiera en fallback:', e);
+      process.exit(1);
+    }
   }
 }
 
 // Cerrar cliente al terminar el proceso
 process.on('SIGINT', async () => {
   try {
-    await client.close();
-    console.log('👋 Conexión a MongoDB cerrada');
+    if (client) {
+      await client.close();
+      console.log('👋 Conexión a MongoDB cerrada');
+    }
   } catch (e) {
     // ignore
   }

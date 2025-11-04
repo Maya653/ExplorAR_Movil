@@ -13,6 +13,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import ExplorAR from './src/screens/ExplorAR';
 import CarreraScreen from './src/screens/CarreraScreen';
 import ARViewerScreen from './src/screens/ARViewerScreen'; // ✅ NUEVO
+import Guardados from './src/screens/Guardados';
 
 // ✅ Importar TODOS los stores
 import useAnalyticsStore from './src/stores/analyticsStore';
@@ -61,6 +62,7 @@ const MainStack = () => {
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Carrera" component={CarreraScreen} />
       <Stack.Screen name="ExplorAR" component={ExplorAR} />
+  <Stack.Screen name="Guardados" component={Guardados} />
       
       {/* ✅ NUEVA PANTALLA: ARViewerScreen */}
       <Stack.Screen 

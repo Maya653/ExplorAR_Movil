@@ -23,20 +23,39 @@ const getLanIpAddress = () => {
 
 // Configuración de API según plataforma
 const getApiBaseUrl = () => {
-  // ✅ CAMBIO: Usar IP real de LAN en lugar de 10.0.2.2
-  if (Platform.OS === 'android') {
-    // Usar tu IP local real (funciona tanto en emulador como dispositivo físico)
-    return 'http://100.100.1.157:5000';
+  // 1) Si el packager/debugger expone hostUri, intentar usar la IP detectada (útil con Expo Go)
+  try {
+    const debuggerHost = Constants.expoConfig?.hostUri || Constants.manifest?.debuggerHost || Constants.manifest2?.extra?.expoClient?.hostUri;
+    if (debuggerHost) {
+      const match = debuggerHost.match(/(\d+\.\d+\.\d+\.\d+)(:\d+)?/);
+      if (match && match[1]) {
+        const ip = match[1];
+        const url = `http://${ip}:5000`;
+        console.log('🌐 API Base detectado desde debuggerHost:', url);
+        return url;
+      }
+    }
+  } catch (e) {
+    // ignore
   }
-  
-  // iOS/Web: intentar LAN primero, sino usar la IP fija
+
+  // 2) Intentar obtener IP LAN (cuando se usa LAN en Expo)
   const lanIp = getLanIpAddress();
   if (lanIp) {
-    return `http://${lanIp}:5000`;
+    const url = `http://${lanIp}:5000`;
+    console.log('🌐 API Base detectado en LAN:', url);
+    return url;
   }
-  
-  // Fallback a tu IP local
-  return 'http://100.100.1.157:5000';
+
+  // 3) Emulador Android clásico (Android emulator uses 10.0.2.2 to reach host)
+  if (Platform.OS === 'android') {
+    console.log('🌐 Plataforma Android detectada — usando 10.0.2.2');
+    return 'http://10.0.2.2:5000';
+  }
+
+  // 4) Fallback general a localhost (útil para iOS simulador / desarrollo local)
+  console.log('🌐 Usando fallback API Base: http://localhost:5000');
+  return 'http://localhost:5000';
 };
 
 export const API_BASE_URL = getApiBaseUrl();

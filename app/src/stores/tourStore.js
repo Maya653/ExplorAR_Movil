@@ -15,7 +15,7 @@ const useTourStore = create((set, get) => ({
   fetchTours: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await apiClient.get(ENDPOINTS.TOURS);
+      const response = await apiClient.get(ENDPOINTS.TOURS, { timeout: 30000 });
       const data = Array.isArray(response.data) ? response.data : [];
       
       console.log(`✅ ${data.length} tours cargados`);
@@ -33,7 +33,7 @@ const useTourStore = create((set, get) => ({
   loadTour: async (tourId) => {
     set({ loading: true, error: null });
     try {
-      const response = await apiClient.get(`${ENDPOINTS.TOURS}/${tourId}`);
+      const response = await apiClient.get(`${ENDPOINTS.TOURS}/${tourId}`, { timeout: 30000 });
       console.log('✅ Tour cargado:', response.data.title);
       set({ currentTour: response.data, loading: false });
       return response.data;

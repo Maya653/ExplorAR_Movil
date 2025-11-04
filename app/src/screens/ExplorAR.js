@@ -56,7 +56,7 @@ const ExplorAR = ({ navigation }) => {
 
   // Construir una lista de bases probables y una función que intente cada una hasta obtener datos
   const LOCALHOST = 'http://localhost:5000';
-  const ANDROID_LOCALHOST = 'http://10.0.2.2:5000';
+  const ANDROID_LOCALHOST = 'http://192.168.1.71:5000';
   
 
   const getLanApiBase = () => {

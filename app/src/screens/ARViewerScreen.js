@@ -17,6 +17,8 @@ import { Renderer } from 'expo-three';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import * as ScreenOrientation from 'expo-screen-orientation';
+import { API_BASE_URL, AR_CONFIG } from '../utils/constants';
 
 // Stores
 import useTourStore from '../stores/tourStore';
@@ -45,6 +47,7 @@ const ARViewerScreen = ({ route, navigation }) => {
   const [startTime] = useState(Date.now());
   const [interactions, setInteractions] = useState(0);
   const [modelLoaded, setModelLoaded] = useState(false);
+  const [sensorControl, setSensorControl] = useState(true);
   
   // Stores
   const { currentTour, loadTour, loading, error, pauseTour, resumeTour, completeTour } = useTourStore();
@@ -59,6 +62,17 @@ const ARViewerScreen = ({ route, navigation }) => {
   const frameIdRef = useRef(null);
   const rotationRef = useRef({ x: 0, y: 0 });
   const zoomRef = useRef(1);
+  const initialScaleRef = useRef(null);
+  const initialDistanceRef = useRef(null);
+  const initialModelPosRef = useRef(null);
+  const lastTouchRef = useRef(null); // {x, y}
+  const initialCenterRef = useRef(null); // {x, y}
+
+  // DeviceMotion subscription ref
+  const deviceMotionSubRef = useRef(null);
+  const baselineRef = useRef({ alpha: 0, beta: 0, gamma: 0 });
+  const smoothedRotRef = useRef({ x: 0, y: 0, z: 0 });
+  const lastRotationRef = useRef({ alpha: 0, beta: 0, gamma: 0 });
 
   // ============================================
   // EFECTOS
@@ -91,6 +105,88 @@ const ARViewerScreen = ({ route, navigation }) => {
     };
   }, [tourId]);
 
+  // Subscribirse a DeviceMotion para mover cámara/modelo al mover el celular
+  // Usamos require dinámico con eval para evitar que Metro intente resolver
+  // el paquete en tiempo de bundle si no está instalado.
+  useEffect(() => {
+    let DeviceMotionModule = null;
+    try {
+      DeviceMotionModule = eval("require('expo-sensors')");
+    } catch (e) {
+      console.warn('expo-sensors no está instalado; movimiento por dispositivo deshabilitado');
+      DeviceMotionModule = null;
+    }
+
+    if (!DeviceMotionModule || !DeviceMotionModule.DeviceMotion) {
+      return () => {};
+    }
+
+    const DeviceMotion = DeviceMotionModule.DeviceMotion;
+    try {
+      DeviceMotion.setUpdateInterval && DeviceMotion.setUpdateInterval(50); // ~20 Hz para mayor fluidez
+    } catch (e) {
+      // ignore
+    }
+
+    const sub = DeviceMotion.addListener((data) => {
+      if (!sensorControl || !modelRef.current) return;
+      const rot = data.rotation || {}; // { alpha, beta, gamma } en radianes
+  const { alpha = 0, beta = 0, gamma = 0 } = rot;
+  lastRotationRef.current = { alpha, beta, gamma };
+
+      // Baseline para "centrar" la posición actual del usuario
+      const base = baselineRef.current;
+      const dAlpha = alpha - base.alpha; // roll
+      const dBeta = beta - base.beta;   // pitch (x)
+      const dGamma = gamma - base.gamma; // yaw (y)
+
+      const yawFactor = currentTour?.arConfig?.sensorYawFactor ?? 1.0;
+      const pitchFactor = currentTour?.arConfig?.sensorPitchFactor ?? 1.0;
+      const rollFactor = currentTour?.arConfig?.sensorRollFactor ?? 0.0; // por defecto ignoramos roll
+
+      // Mapeo: gamma -> rotación Y, beta -> rotación X, alpha -> Z (opcional)
+      let targetX = -dBeta * pitchFactor; // invertir para que se sienta natural
+      let targetY = dGamma * yawFactor;
+      let targetZ = dAlpha * rollFactor;
+
+      // Suavizado simple (low-pass)
+      const smooth = currentTour?.arConfig?.sensorSmoothing ?? 0.15;
+      smoothedRotRef.current.x = smoothedRotRef.current.x + (targetX - smoothedRotRef.current.x) * smooth;
+      smoothedRotRef.current.y = smoothedRotRef.current.y + (targetY - smoothedRotRef.current.y) * smooth;
+      smoothedRotRef.current.z = smoothedRotRef.current.z + (targetZ - smoothedRotRef.current.z) * smooth;
+
+      modelRef.current.rotation.x = smoothedRotRef.current.x;
+      modelRef.current.rotation.y = smoothedRotRef.current.y;
+      modelRef.current.rotation.z = smoothedRotRef.current.z;
+    });
+
+    deviceMotionSubRef.current = sub;
+
+    return () => {
+      try {
+        deviceMotionSubRef.current && deviceMotionSubRef.current.remove && deviceMotionSubRef.current.remove();
+      } catch (e) {
+        // ignore
+      }
+    };
+  }, [modelLoaded, currentTour]);
+
+  // Bloquear la orientación en horizontal mientras esta pantalla esté activa
+  useEffect(() => {
+    const lock = async () => {
+      try {
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      } catch (e) {
+        // ignore
+      }
+    };
+    lock();
+    return () => {
+      // Regresar a orientación vertical por defecto de la app
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+    };
+  }, []);
+
   // ============================================
   // CONFIGURACIÓN DE THREE.JS
   // ============================================
@@ -111,12 +207,18 @@ const ARViewerScreen = ({ route, navigation }) => {
         0.1,
         1000
       );
-      camera.position.z = 3;
+      // Posición inicial; se reajustará automáticamente tras cargar el modelo
+      camera.position.z = currentTour?.arConfig?.cameraZ || 5;
+      camera.position.y = currentTour?.arConfig?.cameraY || 0.5;
       cameraRef.current = camera;
 
       // Crear renderer
       const renderer = new Renderer({ gl });
       renderer.setSize(gl.drawingBufferWidth, gl.drawingBufferHeight);
+      // Asegurar espacio de color correcto para materiales PBR
+      if (renderer.outputEncoding !== undefined) {
+        renderer.outputEncoding = THREE.sRGBEncoding;
+      }
       rendererRef.current = renderer;
 
       // Iluminación
@@ -146,7 +248,8 @@ const ARViewerScreen = ({ route, navigation }) => {
         frameIdRef.current = requestAnimationFrame(animate);
         
         // Rotar modelo si no está pausado
-        if (modelRef.current && !isPaused) {
+        if (modelRef.current && !isPaused && !sensorControl) {
+          // Solo auto-rotar si no estamos en modo sensor
           modelRef.current.rotation.y += 0.005;
         }
 
@@ -156,7 +259,9 @@ const ARViewerScreen = ({ route, navigation }) => {
           modelRef.current.rotation.y += rotationRef.current.y;
         }
 
-        renderer.render(scene, camera);
+        // Renderizar siempre con la cámara activa (embebida del glTF o la por defecto)
+        const activeCamera = cameraRef.current || camera;
+        renderer.render(scene, activeCamera);
         gl.endFrameEXP();
       };
 
@@ -173,48 +278,96 @@ const ARViewerScreen = ({ route, navigation }) => {
   // CARGAR MODELO 3D
   // ============================================
   
+  const toAbsoluteUrl = (url) => {
+    if (!url) return null;
+    try {
+      const u = new URL(url);
+      return u.toString();
+    } catch (e) {
+      // relativo
+    }
+    if (url.startsWith('/')) {
+      return `${API_BASE_URL}${url}`;
+    }
+    return url;
+  };
+
+  const FALLBACK_GLB = 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
+
   const loadModel = async (scene, modelUrl) => {
     return new Promise((resolve, reject) => {
-      console.log('📦 Cargando modelo desde:', modelUrl);
-      
+      const resolvedUrl = toAbsoluteUrl(modelUrl) || FALLBACK_GLB;
+      console.log('📦 Cargando modelo desde:', resolvedUrl);
+
       const loader = new GLTFLoader();
-      
-      loader.load(
-        modelUrl,
-        (gltf) => {
+      try { loader.setCrossOrigin && loader.setCrossOrigin('anonymous'); } catch (e) {}
+
+      let triedFallback = false;
+
+      const doLoad = (url) => {
+        loader.load(
+          url,
+          (gltf) => {
           console.log('✅ Modelo cargado correctamente');
-          
+
           const model = gltf.scene;
-          
-          // Escalar modelo
-          const scale = currentTour?.arConfig?.scale || 0.5;
-          model.scale.set(scale, scale, scale);
-          
-          // Posicionar modelo
-          const pos = currentTour?.arConfig?.initialPosition || { x: 0, y: 0, z: 0 };
-          model.position.set(pos.x, pos.y, pos.z);
-          
-          // Centrar modelo
-          const box = new THREE.Box3().setFromObject(model);
-          const center = box.getCenter(new THREE.Vector3());
-          model.position.sub(center);
-          
+
+          // No modificar transformaciones del modelo: respetar escala/orientación/posición original
           scene.add(model);
           modelRef.current = model;
-          
+
+          // Si el glTF trae una cámara, úsala
+          if (gltf.cameras && gltf.cameras.length > 0) {
+            const gltfCam = gltf.cameras[0];
+            try {
+              gltfCam.aspect = width / height;
+              gltfCam.updateProjectionMatrix && gltfCam.updateProjectionMatrix();
+            } catch (e) {}
+            cameraRef.current = gltfCam;
+          } else {
+            // Enfocar la cámara a los límites del modelo, sin mover el modelo
+            try {
+              const box = new THREE.Box3().setFromObject(model);
+              const size = box.getSize(new THREE.Vector3());
+              const center = box.getCenter(new THREE.Vector3());
+              const maxSize = Math.max(size.x, size.y, size.z) || 1;
+              const cam = cameraRef.current;
+              if (cam && cam.isPerspectiveCamera) {
+                const fov = (cam.fov * Math.PI) / 180;
+                let dist = Math.abs(maxSize / (2 * Math.tan(fov / 2)));
+                dist *= 1.25; // margen
+                cam.near = Math.max(0.01, dist / 100);
+                cam.far = dist * 100;
+                cam.updateProjectionMatrix();
+                cam.position.copy(center.clone().add(new THREE.Vector3(0, 0, dist)));
+                cam.lookAt(center);
+              }
+            } catch (e) {
+              // ignore encuadre si falla
+            }
+          }
+
           setModelLoaded(true);
           resolve(model);
         },
-        (progress) => {
+          (progress) => {
           const percent = (progress.loaded / progress.total) * 100;
           console.log(`📥 Cargando: ${percent.toFixed(0)}%`);
         },
-        (error) => {
-          console.error('❌ Error al cargar modelo:', error);
-          Alert.alert('Error', 'No se pudo cargar el modelo 3D');
-          reject(error);
-        }
-      );
+          (error) => {
+            console.error('❌ Error al cargar modelo:', error);
+            if (!triedFallback) {
+              triedFallback = true;
+              console.log('🔁 Reintentando con modelo de respaldo:', FALLBACK_GLB);
+              return doLoad(FALLBACK_GLB);
+            }
+            Alert.alert('Error', 'No se pudo cargar el modelo 3D');
+            reject(error);
+          }
+        );
+      };
+
+      doLoad(resolvedUrl);
     });
   };
 
@@ -262,15 +415,90 @@ const ARViewerScreen = ({ route, navigation }) => {
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        const touches = evt.nativeEvent.touches || [];
+        if (touches.length === 1) {
+          const t = touches[0];
+          lastTouchRef.current = { x: t.pageX, y: t.pageY };
+        } else if (touches.length >= 2) {
+          const [t1, t2] = touches;
+          const dx = t2.pageX - t1.pageX;
+          const dy = t2.pageY - t1.pageY;
+          initialDistanceRef.current = Math.sqrt(dx * dx + dy * dy);
+          initialScaleRef.current = zoomRef.current;
+          initialModelPosRef.current = modelRef.current
+            ? modelRef.current.position.clone()
+            : new THREE.Vector3(0, 0, 0);
+          initialCenterRef.current = {
+            x: (t1.pageX + t2.pageX) / 2,
+            y: (t1.pageY + t2.pageY) / 2,
+          };
+        }
+      },
       onPanResponderMove: (evt, gestureState) => {
-        // Rotar modelo con gestos
-        rotationRef.current = {
-          x: gestureState.dy * 0.01,
-          y: gestureState.dx * 0.01,
-        };
+        const touches = evt.nativeEvent.touches || [];
+        const ROTATE_SENS = 0.005;
+        const PAN_SENS = 0.005;
+
+        if (!modelRef.current) return;
+
+        if (touches.length === 1) {
+          if (sensorControl) {
+            // En modo sensor, ignoramos rotación por un dedo para no interferir
+            return;
+          }
+          // Rotación con un dedo
+          const t = touches[0];
+          if (lastTouchRef.current) {
+            const dx = t.pageX - lastTouchRef.current.x;
+            const dy = t.pageY - lastTouchRef.current.y;
+            modelRef.current.rotation.y += dx * ROTATE_SENS;
+            modelRef.current.rotation.x += dy * ROTATE_SENS;
+          }
+          lastTouchRef.current = { x: t.pageX, y: t.pageY };
+        } else if (touches.length >= 2) {
+          // Pan + Zoom con dos dedos
+          const [t1, t2] = touches;
+          const dx = t2.pageX - t1.pageX;
+          const dy = t2.pageY - t1.pageY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          if (initialDistanceRef.current && initialScaleRef.current != null) {
+            const scaleFactor = distance / initialDistanceRef.current;
+            const nextZoom = Math.max(
+              AR_CONFIG.MIN_SCALE,
+              Math.min(AR_CONFIG.MAX_SCALE, initialScaleRef.current * scaleFactor)
+            );
+            zoomRef.current = nextZoom;
+            modelRef.current.scale.set(nextZoom, nextZoom, nextZoom);
+          }
+
+          if (initialCenterRef.current && initialModelPosRef.current) {
+            const centerX = (t1.pageX + t2.pageX) / 2;
+            const centerY = (t1.pageY + t2.pageY) / 2;
+            const deltaX = (centerX - initialCenterRef.current.x) * PAN_SENS;
+            const deltaY = (centerY - initialCenterRef.current.y) * PAN_SENS;
+            modelRef.current.position.x = initialModelPosRef.current.x + deltaX;
+            modelRef.current.position.y = initialModelPosRef.current.y - deltaY;
+          }
+        }
       },
       onPanResponderRelease: () => {
         rotationRef.current = { x: 0, y: 0 };
+        lastTouchRef.current = null;
+        initialDistanceRef.current = null;
+        initialScaleRef.current = null;
+        initialModelPosRef.current = null;
+        initialCenterRef.current = null;
+      },
+      onPanResponderTerminationRequest: () => true,
+      onPanResponderTerminate: () => {
+        rotationRef.current = { x: 0, y: 0 };
+        lastTouchRef.current = null;
+        initialDistanceRef.current = null;
+        initialScaleRef.current = null;
+        initialModelPosRef.current = null;
+        initialCenterRef.current = null;
       },
     })
   ).current;
@@ -289,6 +517,32 @@ const ARViewerScreen = ({ route, navigation }) => {
     } else {
       resumeTour();
       console.log('▶️ Tour reanudado');
+    }
+  };
+
+  const handleToggleSensor = () => {
+    setSensorControl((prev) => !prev);
+  };
+
+  const handleCalibrate = () => {
+    // Fija el estado actual como "centro" para deltas cero
+    try {
+      const DeviceMotionModule = eval("require('expo-sensors')");
+      const DeviceMotion = DeviceMotionModule?.DeviceMotion;
+      if (!DeviceMotion) return;
+      // Usamos el último valor de rotación conocido como baseline
+      baselineRef.current = { ...lastRotationRef.current };
+      // Resetea suavizado a cero (sentir recalibre inmediato)
+      smoothedRotRef.current = { x: 0, y: 0, z: 0 };
+      // Y tomamos la pose actual del modelo como nueva base (inversa)
+      if (modelRef.current) {
+        // Si el usuario recalibra, mantenemos la pose actual como punto cero visual
+        // Ajuste: movemos baseline a la rotación actual para que deltas sean ~0
+        // Como no tenemos el último alpha/beta/gamma de forma directa, aproximamos poniendo rot a 0
+        modelRef.current.rotation.set(0, 0, 0);
+      }
+    } catch (e) {
+      // ignore
     }
   };
 
@@ -408,8 +662,19 @@ const ARViewerScreen = ({ route, navigation }) => {
               {isPaused ? <PlayIcon /> : <PauseIcon />}
             </TouchableOpacity>
             
-            <View style={styles.controlButton} />
+            <TouchableOpacity
+              onPress={handleToggleSensor}
+              style={[
+                styles.controlButton,
+                sensorControl ? { backgroundColor: '#10B981' } : null,
+              ]}
+            >
+              <Text style={styles.iconText}>🧭</Text>
+            </TouchableOpacity>
           </View>
+          <TouchableOpacity onPress={handleCalibrate} style={styles.calibrateButton}>
+            <Text style={styles.calibrateText}>Recalibrar orientación</Text>
+          </TouchableOpacity>
           
           {currentTour.hotspots && currentTour.hotspots.length > 0 && (
             <Text style={styles.hotspotHint}>
@@ -654,6 +919,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 8,
     elevation: 8,
+  },
+  calibrateButton: {
+    alignSelf: 'center',
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: 'rgba(0,0,0,0.35)'
+  },
+  calibrateText: {
+    color: '#E5E7EB',
+    fontSize: 12,
   },
   hotspotHint: {
     textAlign: 'center',
