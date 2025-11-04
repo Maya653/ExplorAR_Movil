@@ -106,14 +106,14 @@ const ARViewerScreen = ({ route, navigation }) => {
   }, [tourId]);
 
   // Subscribirse a DeviceMotion para mover cámara/modelo al mover el celular
-  // Usamos require dinámico con eval para evitar que Metro intente resolver
-  // el paquete en tiempo de bundle si no está instalado.
   useEffect(() => {
     let DeviceMotionModule = null;
     try {
-      DeviceMotionModule = eval("require('expo-sensors')");
+      // Importar expo-sensors de forma segura
+      DeviceMotionModule = require('expo-sensors');
+      console.log('✅ expo-sensors cargado correctamente');
     } catch (e) {
-      console.warn('expo-sensors no está instalado; movimiento por dispositivo deshabilitado');
+      console.warn('⚠️ expo-sensors no está instalado; movimiento por dispositivo deshabilitado');
       DeviceMotionModule = null;
     }
 
@@ -221,17 +221,23 @@ const ARViewerScreen = ({ route, navigation }) => {
       }
       rendererRef.current = renderer;
 
-      // Iluminación
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+      // Iluminación mejorada para mejor visibilidad
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
       scene.add(ambientLight);
 
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
       directionalLight.position.set(5, 5, 5);
+      directionalLight.castShadow = true;
       scene.add(directionalLight);
 
-      const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
+      const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
       directionalLight2.position.set(-5, -5, -5);
       scene.add(directionalLight2);
+
+      // Luz adicional desde abajo para eliminar sombras duras
+      const bottomLight = new THREE.DirectionalLight(0xffffff, 0.3);
+      bottomLight.position.set(0, -5, 0);
+      scene.add(bottomLight);
 
       // Cargar modelo 3D
       if (currentTour?.multimedia?.[0]?.url) {
@@ -300,7 +306,16 @@ const ARViewerScreen = ({ route, navigation }) => {
       console.log('📦 Cargando modelo desde:', resolvedUrl);
 
       const loader = new GLTFLoader();
-      try { loader.setCrossOrigin && loader.setCrossOrigin('anonymous'); } catch (e) {}
+      try { 
+        loader.setCrossOrigin && loader.setCrossOrigin('anonymous'); 
+        
+        // Configurar el manager para manejar errores de texturas
+        const manager = new THREE.LoadingManager();
+        manager.onError = function(url) {
+          console.warn('⚠️ Error cargando recurso:', url);
+        };
+        loader.manager = manager;
+      } catch (e) {}
 
       let triedFallback = false;
 
@@ -311,10 +326,43 @@ const ARViewerScreen = ({ route, navigation }) => {
           console.log('✅ Modelo cargado correctamente');
 
           const model = gltf.scene;
+          
+          // Manejar materiales con texturas problemáticas
+          model.traverse((child) => {
+            if (child.isMesh) {
+              // Si hay errores de texturas, usar material básico
+              if (child.material) {
+                try {
+                  // Verificar si el material tiene texturas problemáticas
+                  const material = child.material;
+                  if (material.map && !material.map.image) {
+                    // Si la textura no se cargó correctamente, usar color sólido
+                    const basicMaterial = new THREE.MeshLambertMaterial({
+                      color: material.color || 0xcccccc,
+                      transparent: material.transparent,
+                      opacity: material.opacity || 1.0
+                    });
+                    child.material = basicMaterial;
+                    console.log('🎨 Aplicando material básico por error de textura');
+                  }
+                } catch (e) {
+                  // Si hay error, usar material básico gris
+                  child.material = new THREE.MeshLambertMaterial({ color: 0xcccccc });
+                }
+              }
+            }
+          });
 
           // No modificar transformaciones del modelo: respetar escala/orientación/posición original
           scene.add(model);
           modelRef.current = model;
+          
+          // Debug: información del modelo cargado
+          console.log('📊 Modelo añadido a la escena. Información:');
+          console.log('- Children:', model.children.length);
+          console.log('- Posición:', model.position);
+          console.log('- Escala:', model.scale);
+          console.log('- Rotación:', model.rotation);
 
           // Si el glTF trae una cámara, úsala
           if (gltf.cameras && gltf.cameras.length > 0) {
@@ -527,7 +575,7 @@ const ARViewerScreen = ({ route, navigation }) => {
   const handleCalibrate = () => {
     // Fija el estado actual como "centro" para deltas cero
     try {
-      const DeviceMotionModule = eval("require('expo-sensors')");
+      const DeviceMotionModule = require('expo-sensors');
       const DeviceMotion = DeviceMotionModule?.DeviceMotion;
       if (!DeviceMotion) return;
       // Usamos el último valor de rotación conocido como baseline

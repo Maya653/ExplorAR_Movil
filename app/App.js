@@ -3,6 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, StatusBar, Image, AppState } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+
+// Suprimir warnings específicos de three.js
+import './src/utils/suppressWarnings';
 import { LinearGradient } from 'expo-linear-gradient';
 
 // Importar screens desde src/screens/
