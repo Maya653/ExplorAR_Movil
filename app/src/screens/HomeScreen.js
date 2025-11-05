@@ -32,8 +32,10 @@ import useCareerStore from '../stores/careerStore';
 import useTourStore from '../stores/tourStore';
 import useAnalyticsStore from '../stores/analyticsStore';
 import useHiddenStore from '../stores/hiddenStore';
+import useTourHistoryStore from '../stores/tourHistoryStore';
 import apiClient from '../api/apiClient';
 import { ENDPOINTS } from '../utils/constants';
+import { getTimeAgo, getWatchIndicatorColor } from '../utils/timeUtils';
 
 const HomeScreen = ({ navigation }) => {
   const [searchText, setSearchText] = useState('');
@@ -42,6 +44,7 @@ const HomeScreen = ({ navigation }) => {
   const { careers, loading: careersLoading, fetchCareers, searchCareers } = useCareerStore();
   const { tours, loading: toursLoading, fetchTours } = useTourStore();
   const { trackScreenView, trackCareerView } = useAnalyticsStore();
+  const { getTourWatchInfo, isTourWatched, getRecentlyWatchedTours } = useTourHistoryStore();
 
   const [filteredCareers, setFilteredCareers] = useState([]);
   const [filteredTours, setFilteredTours] = useState([]);
@@ -83,6 +86,17 @@ const HomeScreen = ({ navigation }) => {
     
     // Navegar a detalle
     navigation.navigate('Carrera', { career });
+  };
+
+  // Handler para iniciar un tour AR
+  const handleTourPress = (tour) => {
+    console.log('🎬 Tour AR seleccionado:', tour.title);
+    
+    // Navegar al ARViewer
+    navigation.navigate('ARViewer', {
+      tourId: tour.id || tour._id,
+      tourTitle: tour.title,
+    });
   };
 
   const isLoading = careersLoading || toursLoading;
@@ -230,10 +244,20 @@ const HomeScreen = ({ navigation }) => {
             </ScrollView>
           </View>
 
-          {/* Recent Tours Section */}
+          {/* Available Tours Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Tours Recientes</Text>
+              <Text style={styles.sectionTitle}>Tours Disponibles</Text>
+              <View style={styles.statusLegend}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
+                  <Text style={styles.legendText}>Disponible</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
+                  <Text style={styles.legendText}>Visto</Text>
+                </View>
+              </View>
             </View>
 
             {toursToRender.length === 0 ? (
@@ -243,44 +267,249 @@ const HomeScreen = ({ navigation }) => {
                 </Text>
               </View>
             ) : (
-              toursToRender.map((tour) => (
-                <Swipeable
-                  key={tour.id}
-                  renderLeftActions={renderLeftActions}
-                  renderRightActions={renderRightActions}
-                  onSwipeableOpen={() => hideTour(tour)}
-                >
-                  <TouchableOpacity style={styles.tourCard}>
-                    <View style={styles.tourImageContainer}>
-                      <Image
-                        source={
-                          tour.image
-                            ? (typeof tour.image === 'string' ? { uri: tour.image } : tour.image)
-                            : { uri: 'https://img.icons8.com/color/96/courthouse.png' }
-                        }
-                        style={styles.tourImage}
-                      />
-                      <TouchableOpacity style={styles.playButton}>
-                        <PlayIcon size={12} />
-                      </TouchableOpacity>
-                    </View>
-                    <View style={styles.tourInfo}>
-                      <Text style={styles.tourTitle}>{tour.title}</Text>
-                      <View style={styles.tourDetails}>
-                        <View style={styles.tourDuration}>
-                          <ClockIcon size={16} />
-                          <Text style={styles.durationText}>{tour.duration || '0 min'}</Text>
+              toursToRender.map((tour) => {
+                const watchInfo = getTourWatchInfo(tour.id || tour._id);
+                const isWatched = isTourWatched(tour.id || tour._id);
+                const isAvailable = tour.status === 'active' || tour.isActive !== false;
+                
+                return (
+                  <Swipeable
+                    key={tour.id}
+                    renderLeftActions={renderLeftActions}
+                    renderRightActions={renderRightActions}
+                    onSwipeableOpen={() => hideTour(tour)}
+                  >
+                    <TouchableOpacity 
+                      style={[
+                        styles.tourCard, 
+                        isWatched && styles.watchedTourCard,
+                        !isAvailable && styles.unavailableTourCard
+                      ]}
+                      onPress={() => handleTourPress(tour)}
+                      disabled={!isAvailable}
+                    >
+                      <View style={styles.tourImageContainer}>
+                        <Image
+                          source={
+                            tour.image
+                              ? (typeof tour.image === 'string' ? { uri: tour.image } : tour.image)
+                              : { uri: 'https://img.icons8.com/color/96/courthouse.png' }
+                          }
+                          style={[styles.tourImage, !isAvailable && styles.unavailableImage]}
+                        />
+                        
+                        {/* Estado del tour */}
+                        <View style={[
+                          styles.statusIndicator,
+                          { backgroundColor: isAvailable ? '#10B981' : '#EF4444' }
+                        ]}>
+                          <Text style={styles.statusText}>
+                            {isAvailable ? '📁' : '🔒'}
+                          </Text>
                         </View>
-                        <View style={styles.progressContainer}>
-                          <View style={[styles.progressBar, { width: `${tour.progress || 0}%` }]} />
+                        
+                        {isAvailable && (
+                          <TouchableOpacity 
+                            style={styles.playButton}
+                            onPress={() => handleTourPress(tour)}
+                          >
+                            <PlayIcon size={12} />
+                          </TouchableOpacity>
+                        )}
+                        
+                        {/* Indicador de visto */}
+                        {isWatched && (
+                          <View style={[
+                            styles.watchIndicator,
+                            { backgroundColor: getWatchIndicatorColor(watchInfo?.watchedAt) }
+                          ]}>
+                            <Text style={styles.watchIndicatorText}>👁️</Text>
+                          </View>
+                        )}
+                      </View>
+                      
+                      <View style={styles.tourInfo}>
+                        <View style={styles.tourHeader}>
+                          <Text style={[
+                            styles.tourTitle,
+                            !isAvailable && styles.unavailableText
+                          ]}>
+                            {tour.title}
+                          </Text>
+                          <View style={styles.badgesContainer}>
+                            {!isAvailable && (
+                              <View style={styles.unavailableBadge}>
+                                <Text style={styles.unavailableBadgeText}>NO DISPONIBLE</Text>
+                              </View>
+                            )}
+                            {isWatched && (
+                              <View style={styles.watchBadge}>
+                                <Text style={styles.watchBadgeText}>VISTO</Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                        
+                        {/* Estado detallado */}
+                        <View style={styles.tourStatusContainer}>
+                          <Text style={[
+                            styles.tourStatusText,
+                            { color: isAvailable ? '#10B981' : '#EF4444' }
+                          ]}>
+                            {isAvailable ? '✅ Tour subido y disponible' : '❌ Tour no disponible'}
+                          </Text>
+                        </View>
+                        
+                        {/* Información de visualización */}
+                        {watchInfo && isAvailable && (
+                          <Text style={styles.watchInfoText}>
+                            👀 Visto {getTimeAgo(watchInfo.watchedAt)}
+                            {watchInfo.watchCount > 1 && ` • ${watchInfo.watchCount} veces`}
+                          </Text>
+                        )}
+                        
+                        <View style={styles.tourDetails}>
+                          <View style={styles.tourDuration}>
+                            <ClockIcon size={16} />
+                            <Text style={[
+                              styles.durationText,
+                              !isAvailable && styles.unavailableText
+                            ]}>
+                              {tour.duration || '0 min'}
+                            </Text>
+                          </View>
+                          {isAvailable && (
+                            <View style={styles.progressContainer}>
+                              <View style={[styles.progressBar, { width: `${tour.progress || 0}%` }]} />
+                            </View>
+                          )}
                         </View>
                       </View>
-                    </View>
-                  </TouchableOpacity>
-                </Swipeable>
-              ))
+                    </TouchableOpacity>
+                  </Swipeable>
+                );
+              })
             )}
           </View>
+
+          {/* Tours Recientes Section */}
+          {(() => {
+            const recentTours = getRecentlyWatchedTours();
+            return recentTours.length > 0 ? (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Tours Recientes</Text>
+                  <View style={styles.recentToursInfo}>
+                    <Text style={styles.recentToursSubtitle}>
+                      👁️ {recentTours.length} tours vistos
+                    </Text>
+                    <TouchableOpacity>
+                      <Text style={styles.seeAllButton}>Ver historial</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cardsContainer}>
+                  {recentTours.slice(0, 5).map((watchedTour, index) => {
+                    const timeSinceWatch = Date.now() - new Date(watchedTour.watchedAt).getTime();
+                    const isRecent = timeSinceWatch < 24 * 60 * 60 * 1000; // Menos de 24 horas
+                    const isFrequent = watchedTour.watchCount >= 3;
+                    
+                    return (
+                      <TouchableOpacity
+                        key={`recent-${watchedTour.tourId}`}
+                        style={[
+                          styles.recentTourCard,
+                          isRecent && styles.veryRecentCard,
+                          index === 0 && styles.mostRecentCard
+                        ]}
+                        onPress={() => {
+                          // Buscar el tour completo y navegar
+                          const fullTour = tours.find(t => (t.id || t._id) === watchedTour.tourId);
+                          if (fullTour) {
+                            handleTourPress(fullTour);
+                          }
+                        }}
+                      >
+                        {/* Badge de posición */}
+                        {index === 0 && (
+                          <View style={styles.positionBadge}>
+                            <Text style={styles.positionText}>🏆 RECIENTE</Text>
+                          </View>
+                        )}
+                        
+                        <View style={styles.recentTourHeader}>
+                          <Text style={styles.recentTourTitle} numberOfLines={2}>
+                            {watchedTour.tourTitle}
+                          </Text>
+                          <View style={[
+                            styles.recentWatchIndicator,
+                            { backgroundColor: getWatchIndicatorColor(watchedTour.watchedAt) }
+                          ]}>
+                            <Text style={styles.recentWatchIndicatorText}>👁️</Text>
+                          </View>
+                        </View>
+                        
+                        {/* Estado de visualización */}
+                        <View style={styles.watchStatusContainer}>
+                          <Text style={[
+                            styles.watchStatusText,
+                            { color: isRecent ? '#10B981' : '#F59E0B' }
+                          ]}>
+                            ✅ Has visto este tour
+                          </Text>
+                        </View>
+                        
+                        <View style={styles.recentTourMeta}>
+                          <Text style={styles.recentTourTime}>
+                            🕒 {getTimeAgo(watchedTour.watchedAt)}
+                          </Text>
+                          
+                          <View style={styles.watchStats}>
+                            <Text style={styles.recentTourCount}>
+                              📊 {watchedTour.watchCount} {watchedTour.watchCount === 1 ? 'vez' : 'veces'}
+                            </Text>
+                            {isFrequent && (
+                              <View style={styles.frequentBadge}>
+                                <Text style={styles.frequentText}>⭐ FAVORITO</Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                        
+                        {/* Indicador de tiempo transcurrido */}
+                        <View style={styles.timeIndicatorContainer}>
+                          <View 
+                            style={[
+                              styles.timeIndicator,
+                              { 
+                                backgroundColor: isRecent ? '#10B981' : 
+                                                timeSinceWatch < 7 * 24 * 60 * 60 * 1000 ? '#F59E0B' : '#6B7280'
+                              }
+                            ]}
+                          />
+                          <Text style={styles.timeIndicatorText}>
+                            {isRecent ? 'Recién visto' : 
+                             timeSinceWatch < 7 * 24 * 60 * 60 * 1000 ? 'Esta semana' : 'Hace tiempo'}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            ) : (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Tours Recientes</Text>
+                </View>
+                <View style={styles.emptyRecentContainer}>
+                  <Text style={styles.emptyRecentText}>👀 Aún no has visto ningún tour</Text>
+                  <Text style={styles.emptyRecentSubtext}>¡Explora los tours disponibles para comenzar!</Text>
+                </View>
+              </View>
+            );
+          })()}
 
           {/* Testimonios Section */}
           <View style={styles.section}>
@@ -542,6 +771,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  watchedTourCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981',
+    backgroundColor: '#F0FDF4',
+  },
   tourImageContainer: {
     position: 'relative',
   },
@@ -561,15 +795,54 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  watchIndicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  watchIndicatorText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
   tourInfo: {
     flex: 1,
     padding: 12,
+  },
+  tourHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
   tourTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#111827',
+    flex: 1,
+  },
+  watchBadge: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  watchBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  watchInfoText: {
+    fontSize: 11,
+    color: '#059669',
     marginBottom: 8,
+    fontWeight: '500',
   },
   tourDetails: {
     flexDirection: 'row',
@@ -665,6 +938,238 @@ const styles = StyleSheet.create({
   swipeText: {
     color: '#fff',
     fontWeight: '700',
+  },
+  // Estilos para tours disponibles
+  statusLegend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 4,
+  },
+  legendText: {
+    fontSize: 10,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  unavailableTourCard: {
+    opacity: 0.6,
+    backgroundColor: '#F9FAFB',
+  },
+  unavailableImage: {
+    opacity: 0.5,
+  },
+  unavailableText: {
+    color: '#9CA3AF',
+  },
+  statusIndicator: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusText: {
+    fontSize: 12,
+  },
+  badgesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  unavailableBadge: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  unavailableBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '700',
+  },
+  tourStatusContainer: {
+    marginBottom: 8,
+  },
+  tourStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  
+  // Estilos para tours recientes mejorados
+  recentToursInfo: {
+    alignItems: 'flex-end',
+  },
+  recentToursSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 2,
+  },
+  recentTourCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginRight: 16,
+    width: 200,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    position: 'relative',
+  },
+  veryRecentCard: {
+    borderColor: '#10B981',
+    borderWidth: 2,
+    shadowColor: '#10B981',
+    shadowOpacity: 0.2,
+  },
+  mostRecentCard: {
+    backgroundColor: '#F0FDF4',
+    transform: [{ scale: 1.02 }],
+  },
+  positionBadge: {
+    position: 'absolute',
+    top: -8,
+    right: 8,
+    backgroundColor: '#10B981',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    zIndex: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  positionText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '700',
+  },
+  recentTourHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  recentTourTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    flex: 1,
+    marginRight: 8,
+  },
+  recentWatchIndicator: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  recentWatchIndicatorText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  watchStatusContainer: {
+    marginBottom: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: '#F0FDF4',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#10B981',
+  },
+  watchStatusText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  recentTourMeta: {
+    marginBottom: 8,
+  },
+  recentTourTime: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  watchStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  recentTourCount: {
+    fontSize: 11,
+    color: '#4F46E5',
+    fontWeight: '600',
+  },
+  frequentBadge: {
+    backgroundColor: '#FCD34D',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  frequentText: {
+    color: '#92400E',
+    fontSize: 8,
+    fontWeight: '700',
+  },
+  timeIndicatorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  timeIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  timeIndicatorText: {
+    fontSize: 9,
+    color: '#9CA3AF',
+    fontStyle: 'italic',
+  },
+  emptyRecentContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+  },
+  emptyRecentText: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyRecentSubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
   },
 });
 
