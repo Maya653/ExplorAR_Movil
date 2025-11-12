@@ -73,18 +73,34 @@ const CarreraScreen = ({ route, navigation }) => {
 
 	// ✅ FUNCIÓN ACTUALIZADA PARA NAVEGAR AL VISOR AR
 	const handleTourPress = (tour) => {
-		console.log('🎬 Tour seleccionado:', tour.title);
-		
-		// Registrar analytics
-		trackTourStart(tour.id || tour._id, tour.title, career?.id || career?._id);
-		
-		// ✅ Navegar al visor AR con el ID del tour
-		navigation.navigate('ARViewer', {
-			tourId: tour.id || tour._id,
-			tourTitle: tour.title,
-			careerId: career?.id || career?._id,
-			careerTitle: career?.title,
+	console.log('🎬 Tour seleccionado:', tour.title);
+	console.log('📋 Tipo de tour:', tour.type);
+	
+	// Registrar analytics
+	trackTourStart(tour.id || tour._id, tour.title, career?.id || career?._id);
+	
+	// Detectar tipo de tour
+	const tourType = tour.type?.toLowerCase();
+	
+	if (tourType === 'vr' || tourType === '360' || tourType === 'vr360') {
+		// Tours VR 360°
+		console.log('🥽 Navegando a visor VR 360°');
+		navigation.navigate('VR360Viewer', {
+		tourId: tour.id || tour._id,
+		tourTitle: tour.title,
+		careerId: career?.id || career?._id,
+		careerTitle: career?.title,
 		});
+	} else {
+		// Tours 3D
+		console.log('🎨 Navegando a visor 3D');
+		navigation.navigate('ARViewer', {
+		tourId: tour.id || tour._id,
+		tourTitle: tour.title,
+		careerId: career?.id || career?._id,
+		careerTitle: career?.title,
+		});
+	}
 	};
 
 	return (
