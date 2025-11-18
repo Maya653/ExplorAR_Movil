@@ -8,7 +8,7 @@ require('dotenv').config();
 const formatRating = (rating) => parseFloat(rating || 0).toFixed(1);
 
 const app = express();
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 8080;
 
 app.use(cors());
 app.use(express.json());
@@ -16,7 +16,6 @@ app.use(express.json());
 const uri = process.env.MONGODB_URI;
 
 // Si no hay URI, no abortamos: habilitamos un modo fallback en memoria
-// para que al menos /api/testimonios funcione y la app móvil pueda probarse.
 if (!uri) {
   console.warn('⚠️  MONGODB_URI no está definido en .env. Iniciando en modo fallback en memoria para testimonios.');
 }
@@ -26,6 +25,7 @@ const client = uri ? new MongoClient(uri) : null;
 async function startServer() {
   let connected = false;
   let db, coll, toursColl, testimoniosColl, analyticsColl;
+  
   if (client) {
     try {
       console.log('🔄 Intentando conectar a MongoDB...');
@@ -37,7 +37,7 @@ async function startServer() {
       coll = db.collection('carreras');
       toursColl = db.collection('tours');
       testimoniosColl = db.collection('testimonios');
-      analyticsColl = db.collection('analytics'); // ✅ Nueva colección
+      analyticsColl = db.collection('analytics');
     } catch (err) {
       console.error('❌ No se pudo conectar a MongoDB. Se iniciará el servidor en modo fallback:', err.message);
       connected = false;
@@ -98,7 +98,6 @@ async function startServer() {
       res.json({ ok: true, mode: 'fallback', timestamp: new Date().toISOString() });
     });
 
-    const port = process.env.PORT || 5000;
     app.listen(port, '0.0.0.0', () => {
       console.log(`🚀 Servidor (fallback) corriendo en http://0.0.0.0:${port}`);
       console.log(`📱 Para emulador Android: http://10.0.2.2:${port}`);
@@ -106,7 +105,7 @@ async function startServer() {
       console.log(`   - GET  /api/testimonios`);
       console.log(`   - GET  /health`);
     });
-    return; // No continuar definiendo rutas con DB
+    return;
   }
 
   try {
@@ -137,7 +136,7 @@ async function startServer() {
 
         const mapped = docs.map(d => ({
           id: d._id.toString(),
-          _id: d._id.toString(), // ✅ Agregar también _id
+          _id: d._id.toString(),
           title: d.name,
           tours: d.tourCount ? `${d.tourCount} tours disponibles` : '0 tours disponibles',
           rating: d.averageRating ? formatRating(d.averageRating) : '0.0',
@@ -158,34 +157,60 @@ async function startServer() {
       }
     });
 
-    // ========== ENDPOINT: Tours ==========
-    app.get('/api/tours', async (req, res) => {
+// ========== ENDPOINT: Tours ==========
+app.get('/api/tours', async (req, res) => {
+  try {
+    console.log('📥 GET /api/tours - INICIO');
+    
+    // Primero, intentar obtener solo los IDs para diagnosticar
+    const count = await toursColl.countDocuments();
+    console.log(`📊 Total de tours en BD: ${count}`);
+    
+    // Obtener tours con timeout y proyección simple
+    const docs = await toursColl.find({})
+      .maxTimeMS(10000)
+      .limit(50) // Limitar a 50 para evitar problemas
+      .toArray();
+      
+    console.log(`📦 ${docs.length} tours obtenidos de BD`);
+    
+    // Mapeo MUY seguro con try-catch por cada documento
+    const mapped = [];
+    for (const t of docs) {
       try {
-        console.log('📥 GET /api/tours');
-        const docs = await toursColl.find({}).toArray();
-        
-        const mapped = docs.map(t => ({
-          id: t._id.toString(),
-          _id: t._id.toString(), // ✅ Agregar también _id
+        const tour = {
+          id: t._id ? t._id.toString() : '',
+          _id: t._id ? t._id.toString() : '',
           title: t.title || t.name || 'Sin título',
-          duration: t.duration || t.durationText || (t.length ? `${t.length} min` : '0 min'),
-          progress: typeof t.progress === 'number' ? t.progress : (t.progressPercent || 0),
-          image: t.imageUrl || (t.image && (typeof t.image === 'string' ? t.image : (t.image.uri || null))) || null,
-          description: t.description || '',
-          careerId: t.careerId || t.career || null, // ✅ Importante para filtrar
-          type: t.type || 'AR',
-        }));
-        
-        console.log(`✅ Enviando ${mapped.length} tours`);
-        return res.json(mapped);
-      } catch (err) {
-        console.error('❌ Error en GET /api/tours:', err);
-        return res.status(500).json({ 
-          error: 'Error interno del servidor', 
-          details: err.message 
-        });
+          duration: String(t.duration || '0 min'),
+          progress: Number(t.progress || 0),
+          image: t.imageUrl || t.image || null,
+          description: String(t.description || ''),
+          careerId: t.careerId ? String(t.careerId) : null,
+          type: String(t.type || 'AR'),
+        };
+        mapped.push(tour);
+      } catch (mapErr) {
+        console.error(`⚠️  Error mapeando tour ${t._id}:`, mapErr.message);
+        // Continuar con el siguiente tour
       }
+    }
+    
+    console.log(`✅ ${mapped.length} tours mapeados correctamente`);
+    console.log(`📤 Enviando respuesta...`);
+    
+    res.json(mapped);
+    console.log(`✅ Respuesta enviada`);
+    
+  } catch (err) {
+    console.error('❌ Error en GET /api/tours:', err.message);
+    console.error('Stack:', err.stack);
+    res.status(500).json({ 
+      error: 'Error interno del servidor', 
+      details: err.message 
     });
+  }
+});
 
     // ========== ENDPOINT: Tour individual ==========
     app.get('/api/tours/:id', async (req, res) => {
@@ -224,14 +249,12 @@ async function startServer() {
       }
     });
 
-    // ========== ENDPOINT: Modelo del tour (redirección a GLB público) ==========
+    // ========== ENDPOINT: Modelo del tour ==========
     app.get('/api/tours/:id/model', async (req, res) => {
       try {
         const { id } = req.params;
         console.log(`📥 GET /api/tours/${id}/model`);
 
-        // Si tuvieras una URL específica en BD, podrías devolverla aquí.
-        // De momento, redirigimos a un GLB público estable como fallback.
         const fallbackGlb = 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
         return res.redirect(302, fallbackGlb);
       } catch (err) {
@@ -245,8 +268,6 @@ async function startServer() {
       try {
         console.log('📥 GET /api/testimonios');
         const docs = await testimoniosColl.find({}).toArray();
-        // Orden opcional por fecha si existe
-        // const docs = await testimoniosColl.find({}).sort({ createdAt: -1 }).toArray();
         const mapped = docs.map(mapTestimonio);
         console.log(`✅ Enviando ${mapped.length} testimonios`);
         return res.json(mapped);
@@ -270,14 +291,12 @@ async function startServer() {
 
         console.log(`📊 Recibiendo ${events.length} eventos de analytics...`);
 
-        // Preparar documentos para insertar
         const docs = events.map(event => ({
           ...event,
           batchTimestamp: batchTimestamp || new Date().toISOString(),
           createdAt: new Date(),
         }));
 
-        // Insertar en colección 'analytics'
         const result = await analyticsColl.insertMany(docs);
 
         console.log(`✅ ${result.insertedCount} eventos guardados en MongoDB`);
@@ -352,6 +371,11 @@ async function startServer() {
       res.json({ ok: true, timestamp: new Date().toISOString() });
     });
 
+  } catch (err) {
+    console.error('❌ Error configurando endpoints:', err);
+  }
+
+  // ========== INICIAR SERVIDOR (FUERA DEL TRY) ==========
   app.listen(port, '0.0.0.0', () => {
     console.log(`🚀 Servidor corriendo en http://0.0.0.0:${port}`);
     console.log(`📱 Para emulador Android: http://10.0.2.2:${port}`);
@@ -363,22 +387,6 @@ async function startServer() {
     console.log(`   - POST /api/analytics`);
     console.log(`   - GET  /health`);
   });
-  } catch (err) {
-    console.error('❌ Error iniciando servidor:', err);
-    // Si algo falla aquí, intentamos al menos exponer fallback de testimonios
-    try {
-      console.warn('🔁 Intentando iniciar servidor en modo fallback mínimo...');
-      app.get('/api/testimonios', (req, res) => res.json(sampleTestimonios.map(mapTestimonio)));
-      app.get('/health', (req, res) => res.json({ ok: true, mode: 'fallback-error', timestamp: new Date().toISOString() }));
-      const port = process.env.PORT || 5000;
-      app.listen(port, '0.0.0.0', () => {
-        console.log(`🚀 Servidor (fallback-error) corriendo en http://0.0.0.0:${port}`);
-      });
-    } catch (e) {
-      console.error('⛔ No fue posible iniciar ni siquiera en fallback:', e);
-      process.exit(1);
-    }
-  }
 }
 
 // Cerrar cliente al terminar el proceso
