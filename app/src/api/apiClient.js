@@ -22,8 +22,7 @@ import Constants from 'expo-constants';
  */
 
 // ⬇️ ACTUALIZA ESTA URL CUANDO REINICIES NGROK ⬇️
-const NGROK_URL = 'explorarmovil-production.up.railway.app';
-// ============================================
+const NGROK_URL = 'https://explorarmovil-production.up.railway.app';// ============================================
 // OBTENER API BASE URL
 // ============================================
 
