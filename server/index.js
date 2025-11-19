@@ -22,6 +22,28 @@ if (!uri) {
 
 const client = uri ? new MongoClient(uri) : null;
 
+// ✅ CACHE PARA TOURS
+let toursCache = null;
+let toursCacheTime = null;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+
+// ========== MANEJO GLOBAL DE ERRORES ==========
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 Unhandled Rejection:');
+  console.error('Razón:', reason);
+  console.error('Stack:', reason?.stack);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('💥 Uncaught Exception:');
+  console.error('Error:', error);
+  console.error('Stack:', error.stack);
+});
+
+process.on('warning', (warning) => {
+  console.warn('⚠️  Warning:', warning.name, warning.message);
+});
+
 async function startServer() {
   let connected = false;
   let db, coll, toursColl, testimoniosColl, analyticsColl;
@@ -157,60 +179,83 @@ async function startServer() {
       }
     });
 
-// ========== ENDPOINT: Tours ==========
-app.get('/api/tours', async (req, res) => {
-  try {
-    console.log('📥 GET /api/tours - INICIO');
-    
-    // Primero, intentar obtener solo los IDs para diagnosticar
-    const count = await toursColl.countDocuments();
-    console.log(`📊 Total de tours en BD: ${count}`);
-    
-    // Obtener tours con timeout y proyección simple
-    const docs = await toursColl.find({})
-      .maxTimeMS(10000)
-      .limit(50) // Limitar a 50 para evitar problemas
-      .toArray();
+    // ========== ENDPOINT: Tours CON CACHE ==========
+    app.get('/api/tours', async (req, res) => {
+      console.log('📥 GET /api/tours - INICIO');
       
-    console.log(`📦 ${docs.length} tours obtenidos de BD`);
-    
-    // Mapeo MUY seguro con try-catch por cada documento
-    const mapped = [];
-    for (const t of docs) {
       try {
-        const tour = {
-          id: t._id ? t._id.toString() : '',
-          _id: t._id ? t._id.toString() : '',
+        // ✅ VERIFICAR SI HAY CACHE VÁLIDO
+        const now = Date.now();
+        if (toursCache && toursCacheTime && (now - toursCacheTime < CACHE_DURATION)) {
+          const cacheAge = Math.floor((now - toursCacheTime) / 1000);
+          console.log(`✅ Usando cache (${cacheAge} segundos de antigüedad)`);
+          return res.json(toursCache);
+        }
+        
+        // Cache vacío o expirado, consultar MongoDB
+        console.log('🔄 Cache vacío o expirado, consultando MongoDB...');
+        
+        // ✅ CONSULTA A MONGODB (solo metadatos)
+        const docs = await toursColl.aggregate([
+          {
+            $project: {
+              _id: 1,
+              title: 1,
+              name: 1,
+              duration: 1,
+              progress: 1,
+              image: 1,
+              imageUrl: 1,
+              description: 1,
+              careerId: 1,
+              career: 1,
+              type: 1
+            }
+          },
+          { $limit: 50 }
+        ])
+        .maxTimeMS(180000) // 3 minutos timeout
+        .toArray();
+        
+        console.log(`📦 ${docs.length} tours obtenidos de MongoDB`);
+        
+        // ✅ MAPEAR DATOS
+        const mapped = docs.map(t => ({
+          id: t._id?.toString() || '',
+          _id: t._id?.toString() || '',
           title: t.title || t.name || 'Sin título',
-          duration: String(t.duration || '0 min'),
-          progress: Number(t.progress || 0),
+          duration: t.duration || '0 min',
+          progress: t.progress || 0,
           image: t.imageUrl || t.image || null,
-          description: String(t.description || ''),
-          careerId: t.careerId ? String(t.careerId) : null,
-          type: String(t.type || 'AR'),
-        };
-        mapped.push(tour);
-      } catch (mapErr) {
-        console.error(`⚠️  Error mapeando tour ${t._id}:`, mapErr.message);
-        // Continuar con el siguiente tour
+          description: t.description || '',
+          careerId: t.careerId?.toString() || t.career?.toString() || null,
+          type: t.type || 'AR',
+          multimedia: [] // Se carga en /api/tours/:id
+        }));
+        
+        // ✅ GUARDAR EN CACHE
+        toursCache = mapped;
+        toursCacheTime = now;
+        
+        const cacheExpiry = Math.floor(CACHE_DURATION / 1000);
+        console.log(`✅ ${mapped.length} tours guardados en cache (válido por ${cacheExpiry} segundos)`);
+        res.json(mapped);
+        
+      } catch (err) {
+        console.error('❌ Error en /api/tours:', err.message);
+        
+        // ✅ FALLBACK: Si hay cache viejo, usarlo
+        if (toursCache) {
+          console.warn('⚠️ Error en MongoDB, usando cache antiguo como fallback');
+          return res.json(toursCache);
+        }
+        
+        res.status(500).json({ 
+          error: 'Error al obtener tours',
+          message: err.message 
+        });
       }
-    }
-    
-    console.log(`✅ ${mapped.length} tours mapeados correctamente`);
-    console.log(`📤 Enviando respuesta...`);
-    
-    res.json(mapped);
-    console.log(`✅ Respuesta enviada`);
-    
-  } catch (err) {
-    console.error('❌ Error en GET /api/tours:', err.message);
-    console.error('Stack:', err.stack);
-    res.status(500).json({ 
-      error: 'Error interno del servidor', 
-      details: err.message 
     });
-  }
-});
 
     // ========== ENDPOINT: Tour individual ==========
     app.get('/api/tours/:id', async (req, res) => {
@@ -365,17 +410,32 @@ app.get('/api/tours', async (req, res) => {
       }
     });
 
+    // ========== ENDPOINT: Limpiar cache de tours ==========
+    app.post('/api/tours/clear-cache', (req, res) => {
+      toursCache = null;
+      toursCacheTime = null;
+      console.log('🗑️ Cache de tours limpiado manualmente');
+      res.json({ success: true, message: 'Cache limpiado exitosamente' });
+    });
+
     // ========== Health check ==========
     app.get('/health', (req, res) => {
       console.log('💚 Health check');
-      res.json({ ok: true, timestamp: new Date().toISOString() });
+      res.json({ 
+        ok: true, 
+        timestamp: new Date().toISOString(),
+        cache: {
+          tours: toursCache ? toursCache.length : 0,
+          age: toursCacheTime ? Math.floor((Date.now() - toursCacheTime) / 1000) : null
+        }
+      });
     });
 
   } catch (err) {
     console.error('❌ Error configurando endpoints:', err);
   }
 
-  // ========== INICIAR SERVIDOR (FUERA DEL TRY) ==========
+  // ========== INICIAR SERVIDOR ==========
   app.listen(port, '0.0.0.0', () => {
     console.log(`🚀 Servidor corriendo en http://0.0.0.0:${port}`);
     console.log(`📱 Para emulador Android: http://10.0.2.2:${port}`);
@@ -385,6 +445,7 @@ app.get('/api/tours', async (req, res) => {
     console.log(`   - GET  /api/tours/:id`);
     console.log(`   - GET  /api/testimonios`);
     console.log(`   - POST /api/analytics`);
+    console.log(`   - POST /api/tours/clear-cache`);
     console.log(`   - GET  /health`);
   });
 }
