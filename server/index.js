@@ -308,22 +308,45 @@ async function startServer() {
       }
     });
 
-    // ========== ENDPOINT: Testimonios ==========
-    app.get('/api/testimonios', async (req, res) => {
-      try {
-        console.log('📥 GET /api/testimonios');
-        const docs = await testimoniosColl.find({}).toArray();
-        const mapped = docs.map(mapTestimonio);
-        console.log(`✅ Enviando ${mapped.length} testimonios`);
-        return res.json(mapped);
-      } catch (err) {
-        console.error('❌ Error en GET /api/testimonios:', err);
-        return res.status(500).json({ 
-          error: 'Error interno del servidor', 
-          details: err.message 
-        });
-      }
+   // ========== ENDPOINT: Testimonios CON CACHE ==========
+app.get('/api/testimonios', async (req, res) => {
+  console.log('📥 GET /api/testimonios - INICIO');
+  
+  try {
+    // ✅ VERIFICAR CACHE
+    const now = Date.now();
+    if (testimoniosCache && testimoniosCacheTime && (now - testimoniosCacheTime < CACHE_DURATION)) {
+      const cacheAge = Math.floor((now - testimoniosCacheTime) / 1000);
+      console.log(`✅ Usando cache de testimonios (${cacheAge}s)`);
+      return res.json(testimoniosCache);
+    }
+    
+    console.log('🔄 Consultando MongoDB...');
+    const docs = await testimoniosColl.find({}).toArray();
+    const mapped = docs.map(mapTestimonio);
+    
+    // ✅ GUARDAR EN CACHE
+    testimoniosCache = mapped;
+    testimoniosCacheTime = now;
+    
+    console.log(`✅ ${mapped.length} testimonios (guardados en cache)`);
+    res.json(mapped);
+    
+  } catch (err) {
+    console.error('❌ Error en /api/testimonios:', err);
+    
+    // ✅ FALLBACK: Cache viejo
+    if (testimoniosCache) {
+      console.warn('⚠️ Usando cache antiguo de testimonios');
+      return res.json(testimoniosCache);
+    }
+    
+    res.status(500).json({ 
+      error: 'Error interno del servidor', 
+      details: err.message 
     });
+  }
+});
 
     // ========== ENDPOINT: Analytics (POST) ==========
     app.post('/api/analytics', async (req, res) => {
