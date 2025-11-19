@@ -17,7 +17,7 @@ const uri = process.env.MONGODB_URI;
 
 // Si no hay URI, no abortamos: habilitamos un modo fallback en memoria
 if (!uri) {
-  console.warn('⚠️  MONGODB_URI no está definido en .env. Iniciando en modo fallback en memoria para testimonios.');
+  console.warn('⚠️  MONGODB_URI no está definido en .env. Iniciando en modo fallback en memoria.');
 }
 
 const client = uri ? new MongoClient(uri) : null;
@@ -25,6 +25,11 @@ const client = uri ? new MongoClient(uri) : null;
 // ✅ CACHE PARA TOURS
 let toursCache = null;
 let toursCacheTime = null;
+
+// ✅ CACHE PARA TESTIMONIOS
+let testimoniosCache = null;
+let testimoniosCacheTime = null;
+
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
 // ========== MANEJO GLOBAL DE ERRORES ==========
@@ -86,8 +91,6 @@ async function startServer() {
       role: 'Egresada de Mecatrónica',
       year: '2022',
       text: 'ExplorAR me ayudó a decidir mi carrera con una experiencia inmersiva y práctica.',
-      transcript: 'Transcripción breve del testimonio de Ana...',
-      mediaUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     },
     {
       _id: 'sample-2',
@@ -96,7 +99,6 @@ async function startServer() {
       position: 'Estudiante de Sistemas',
       date: '2024',
       testimonio: 'Los tours en AR son increíbles para entender los laboratorios del campus.',
-      videoUrl: 'https://youtu.be/aqz-KE-bpKQ',
     },
   ];
 
@@ -188,7 +190,7 @@ async function startServer() {
         const now = Date.now();
         if (toursCache && toursCacheTime && (now - toursCacheTime < CACHE_DURATION)) {
           const cacheAge = Math.floor((now - toursCacheTime) / 1000);
-          console.log(`✅ Usando cache (${cacheAge} segundos de antigüedad)`);
+          console.log(`✅ Usando cache de tours (${cacheAge}s de antigüedad)`);
           return res.json(toursCache);
         }
         
@@ -243,10 +245,11 @@ async function startServer() {
         
       } catch (err) {
         console.error('❌ Error en /api/tours:', err.message);
+        console.error('Stack:', err.stack);
         
         // ✅ FALLBACK: Si hay cache viejo, usarlo
         if (toursCache) {
-          console.warn('⚠️ Error en MongoDB, usando cache antiguo como fallback');
+          console.warn('⚠️ Error en MongoDB, usando cache antiguo de tours');
           return res.json(toursCache);
         }
         
@@ -308,45 +311,51 @@ async function startServer() {
       }
     });
 
-   // ========== ENDPOINT: Testimonios CON CACHE ==========
-app.get('/api/testimonios', async (req, res) => {
-  console.log('📥 GET /api/testimonios - INICIO');
-  
-  try {
-    // ✅ VERIFICAR CACHE
-    const now = Date.now();
-    if (testimoniosCache && testimoniosCacheTime && (now - testimoniosCacheTime < CACHE_DURATION)) {
-      const cacheAge = Math.floor((now - testimoniosCacheTime) / 1000);
-      console.log(`✅ Usando cache de testimonios (${cacheAge}s)`);
-      return res.json(testimoniosCache);
-    }
-    
-    console.log('🔄 Consultando MongoDB...');
-    const docs = await testimoniosColl.find({}).toArray();
-    const mapped = docs.map(mapTestimonio);
-    
-    // ✅ GUARDAR EN CACHE
-    testimoniosCache = mapped;
-    testimoniosCacheTime = now;
-    
-    console.log(`✅ ${mapped.length} testimonios (guardados en cache)`);
-    res.json(mapped);
-    
-  } catch (err) {
-    console.error('❌ Error en /api/testimonios:', err);
-    
-    // ✅ FALLBACK: Cache viejo
-    if (testimoniosCache) {
-      console.warn('⚠️ Usando cache antiguo de testimonios');
-      return res.json(testimoniosCache);
-    }
-    
-    res.status(500).json({ 
-      error: 'Error interno del servidor', 
-      details: err.message 
+    // ========== ENDPOINT: Testimonios CON CACHE ==========
+    app.get('/api/testimonios', async (req, res) => {
+      console.log('📥 GET /api/testimonios - INICIO');
+      
+      try {
+        // ✅ VERIFICAR CACHE
+        const now = Date.now();
+        if (testimoniosCache && testimoniosCacheTime && (now - testimoniosCacheTime < CACHE_DURATION)) {
+          const cacheAge = Math.floor((now - testimoniosCacheTime) / 1000);
+          console.log(`✅ Usando cache de testimonios (${cacheAge}s de antigüedad)`);
+          return res.json(testimoniosCache);
+        }
+        
+        console.log('🔄 Consultando MongoDB...');
+        const docs = await testimoniosColl.find({})
+          .maxTimeMS(60000)
+          .toArray();
+        
+        console.log(`📦 ${docs.length} testimonios obtenidos`);
+        
+        const mapped = docs.map(mapTestimonio);
+        
+        // ✅ GUARDAR EN CACHE
+        testimoniosCache = mapped;
+        testimoniosCacheTime = now;
+        
+        console.log(`✅ ${mapped.length} testimonios guardados en cache`);
+        res.json(mapped);
+        
+      } catch (err) {
+        console.error('❌ Error en /api/testimonios:', err.message);
+        console.error('Stack:', err.stack);
+        
+        // ✅ FALLBACK: Cache viejo
+        if (testimoniosCache) {
+          console.warn('⚠️ Usando cache antiguo de testimonios');
+          return res.json(testimoniosCache);
+        }
+        
+        res.status(500).json({ 
+          error: 'Error interno del servidor', 
+          details: err.message 
+        });
+      }
     });
-  }
-});
 
     // ========== ENDPOINT: Analytics (POST) ==========
     app.post('/api/analytics', async (req, res) => {
@@ -438,7 +447,25 @@ app.get('/api/testimonios', async (req, res) => {
       toursCache = null;
       toursCacheTime = null;
       console.log('🗑️ Cache de tours limpiado manualmente');
-      res.json({ success: true, message: 'Cache limpiado exitosamente' });
+      res.json({ success: true, message: 'Cache de tours limpiado' });
+    });
+
+    // ========== ENDPOINT: Limpiar cache de testimonios ==========
+    app.post('/api/testimonios/clear-cache', (req, res) => {
+      testimoniosCache = null;
+      testimoniosCacheTime = null;
+      console.log('🗑️ Cache de testimonios limpiado manualmente');
+      res.json({ success: true, message: 'Cache de testimonios limpiado' });
+    });
+
+    // ========== ENDPOINT: Limpiar todo el cache ==========
+    app.post('/api/clear-all-cache', (req, res) => {
+      toursCache = null;
+      toursCacheTime = null;
+      testimoniosCache = null;
+      testimoniosCacheTime = null;
+      console.log('🗑️ TODO el cache limpiado manualmente');
+      res.json({ success: true, message: 'Todo el cache limpiado' });
     });
 
     // ========== Health check ==========
@@ -448,8 +475,14 @@ app.get('/api/testimonios', async (req, res) => {
         ok: true, 
         timestamp: new Date().toISOString(),
         cache: {
-          tours: toursCache ? toursCache.length : 0,
-          age: toursCacheTime ? Math.floor((Date.now() - toursCacheTime) / 1000) : null
+          tours: {
+            count: toursCache ? toursCache.length : 0,
+            age: toursCacheTime ? Math.floor((Date.now() - toursCacheTime) / 1000) : null
+          },
+          testimonios: {
+            count: testimoniosCache ? testimoniosCache.length : 0,
+            age: testimoniosCacheTime ? Math.floor((Date.now() - testimoniosCacheTime) / 1000) : null
+          }
         }
       });
     });
@@ -469,6 +502,8 @@ app.get('/api/testimonios', async (req, res) => {
     console.log(`   - GET  /api/testimonios`);
     console.log(`   - POST /api/analytics`);
     console.log(`   - POST /api/tours/clear-cache`);
+    console.log(`   - POST /api/testimonios/clear-cache`);
+    console.log(`   - POST /api/clear-all-cache`);
     console.log(`   - GET  /health`);
   });
 }
