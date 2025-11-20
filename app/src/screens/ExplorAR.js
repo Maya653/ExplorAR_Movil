@@ -1,3 +1,4 @@
+// src/screens/ExplorAR.js - OPTIMIZADO
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -16,6 +17,11 @@ import {
 import { WebView } from 'react-native-webview';
 import useAnalyticsStore from '../stores/analyticsStore';
 import apiClient from '../api/apiClient';
+
+// ✅ CACHE EN MEMORIA (persiste durante la sesión)
+let testimoniosCache = null;
+let cacheTimestamp = null;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
 // Helpers
 const getYouTubeIdFromUrl = (url) => {
@@ -54,50 +60,92 @@ const ExplorAR = ({ navigation }) => {
 
   useEffect(() => {   
     trackScreenView('Testimonials');
-
-    const fetchTestimonios = async () => {
-      try {
-        console.log('📥 Cargando testimonios...');
-        
-        // ✅ AUMENTAR TIMEOUT A 60 SEGUNDOS
-        const response = await apiClient.get('/api/testimonios', {
-          timeout: 60000 // ← CAMBIO AQUÍ: de 30000 a 60000
-        });
-        
-        if (response.data && Array.isArray(response.data)) {
-          console.log(`✅ ${response.data.length} testimonios cargados`);
-          setTestimonios(response.data);
-        } else {
-          console.warn('Respuesta inesperada:', response.data);
-          setTestimonios([]);
-        }
-      } catch (err) {
-        console.error('Error cargando testimonios:', err.message || err);
-        setTestimonios([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchTestimonios();
   }, []);
+
+  const fetchTestimonios = async () => {
+    // ✅ VERIFICAR CACHE PRIMERO
+    const now = Date.now();
+    if (testimoniosCache && cacheTimestamp && (now - cacheTimestamp) < CACHE_DURATION) {
+      console.log('📦 Usando testimonios en cache');
+      setTestimonios(testimoniosCache);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      console.log('📥 Cargando testimonios desde servidor...');
+      
+      // ✅ CONFIGURACIÓN OPTIMIZADA
+      const response = await apiClient.get('/api/testimonios', {
+        timeout: 60000,  // 60 segundos
+        retries: 2,      // Solo 2 reintentos (en vez de 3)
+      });
+      
+      if (response.data && Array.isArray(response.data)) {
+        console.log(`✅ ${response.data.length} testimonios cargados`);
+        
+        // ✅ GUARDAR EN CACHE
+        testimoniosCache = response.data;
+        cacheTimestamp = Date.now();
+        
+        setTestimonios(response.data);
+      } else {
+        console.warn('Respuesta inesperada:', response.data);
+        setTestimonios([]);
+      }
+    } catch (err) {
+      console.error('Error cargando testimonios:', err.message || err);
+      
+      // ✅ SI HAY CACHE, USARLO AUNQUE SEA ANTIGUO
+      if (testimoniosCache) {
+        console.log('⚠️ Usando cache antiguo debido al error');
+        setTestimonios(testimoniosCache);
+      } else {
+        setTestimonios([]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ FUNCIÓN PARA REFRESCAR MANUALMENTE
+  const handleRefresh = () => {
+    testimoniosCache = null;
+    cacheTimestamp = null;
+    setLoading(true);
+    fetchTestimonios();
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      
+      {/* Header con botón de refresh */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Image source={require('../../assets/flecha_retorno.png')} style={styles.backIcon} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Testimonios</Text>
+        {/* ✅ BOTÓN DE REFRESH */}
+        <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
+          <Text style={styles.refreshIcon}>🔄</Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#4F46E5" style={{ marginTop: 24 }} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4F46E5" />
+          <Text style={styles.loadingText}>Cargando testimonios...</Text>
+        </View>
       ) : testimonios.length === 0 ? (
         <View style={styles.emptyBox}>
+          <Text style={styles.emptyIcon}>📝</Text>
           <Text style={styles.emptyTitle}>No hay testimonios disponibles</Text>
           <Text style={styles.emptySubtitle}>Intenta nuevamente más tarde</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+            <Text style={styles.retryButtonText}>Reintentar</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
@@ -134,6 +182,7 @@ const ExplorAR = ({ navigation }) => {
         </ScrollView>
       )}
 
+      {/* Modal sin cambios */}
       <Modal visible={!!selected} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -248,8 +297,51 @@ const ExplorAR = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
-  header: { padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee', position: 'relative', alignItems: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: '#111827', textAlign: 'center' },
+  header: { 
+    padding: 16, 
+    backgroundColor: '#fff', 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#eee', 
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  headerTitle: { 
+    fontSize: 20, 
+    fontWeight: '700', 
+    color: '#111827', 
+    flex: 1,
+    textAlign: 'center' 
+  },
+  backButton: { 
+    width: 36, 
+    height: 36, 
+    borderRadius: 18, 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  backIcon: { width: 18, height: 18, tintColor: '#111827' },
+  refreshButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  refreshIcon: {
+    fontSize: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#6B7280',
+  },
   scroll: { padding: 16, paddingBottom: 40 },
   cardHorizontal: {
     flexDirection: 'row',
@@ -301,11 +393,22 @@ const styles = StyleSheet.create({
   modalFooter: { padding: 12, borderTopWidth: 1, borderTopColor: '#eee', alignItems: 'flex-end' },
   closeButton: { backgroundColor: '#4F46E5', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
   closeText: { color: '#fff', fontWeight: '700' },
-  backButton: { position: 'absolute', left: 12, top: 12, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  backIcon: { width: 18, height: 18, tintColor: '#111827' },
-  emptyBox: { padding: 24, alignItems: 'center' },
+  emptyBox: { flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center' },
+  emptyIcon: { fontSize: 48, marginBottom: 16 },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 6 },
-  emptySubtitle: { fontSize: 13, color: '#6B7280', textAlign: 'center' },
+  emptySubtitle: { fontSize: 13, color: '#6B7280', textAlign: 'center', marginBottom: 16 },
+  retryButton: {
+    backgroundColor: '#4F46E5',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
   testimonioSection: {
     marginTop: 16,
     marginBottom: 8,

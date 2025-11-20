@@ -1,134 +1,181 @@
 // src/screens/TourHistoryScreen.js
-import React, { useEffect } from 'react';
+// Pantalla para ver y gestionar el historial de tours vistos
+
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
+  ScrollView,
+  Alert,
   SafeAreaView,
-  StatusBar,
-  Image,
 } from 'react-native';
 import useTourHistoryStore from '../stores/tourHistoryStore';
-import useTourStore from '../stores/tourStore';
-import useAnalyticsStore from '../stores/analyticsStore';
-import { getTimeAgo, getWatchIndicatorColor } from '../utils/timeUtils';
+import { getTimeAgo } from '../utils/timeUtils';
 
 const TourHistoryScreen = ({ navigation }) => {
-  const { getRecentlyWatchedTours, clearHistory } = useTourHistoryStore();
-  const { tours } = useTourStore();
-  const { trackScreenView } = useAnalyticsStore();
+  const { 
+    watchedTours, 
+    getStats, 
+    clearHistory, 
+    removeTourFromHistory,
+    resetTourWatchCount,
+  } = useTourHistoryStore();
 
-  const watchedTours = getRecentlyWatchedTours();
+  const [stats, setStats] = useState({ totalTours: 0, totalWatches: 0, averageWatches: 0 });
 
   useEffect(() => {
-    trackScreenView('TourHistory');
-  }, []);
+    setStats(getStats());
+  }, [watchedTours]);
 
-  const handleTourPress = (watchedTour) => {
-    const fullTour = tours.find((t) => (t.id || t._id) === watchedTour.tourId);
-    if (fullTour) {
-      navigation.navigate('ARViewer', {
-        tourId: fullTour.id || fullTour._id,
-        tourTitle: fullTour.title,
-      });
-    }
+  const handleClearHistory = () => {
+    Alert.alert(
+      '🗑️ Limpiar Historial',
+      '¿Estás seguro de que quieres eliminar todo tu historial de tours vistos?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Limpiar',
+          style: 'destructive',
+          onPress: () => {
+            clearHistory();
+            Alert.alert('✅ Historial limpiado', 'Tu historial ha sido eliminado completamente');
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRemoveTour = (tourId, tourTitle) => {
+    Alert.alert(
+      '🗑️ Eliminar Tour',
+      `¿Quieres eliminar "${tourTitle}" de tu historial?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => {
+            removeTourFromHistory(tourId);
+            Alert.alert('✅ Tour eliminado', `"${tourTitle}" ha sido eliminado de tu historial`);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleResetCount = (tourId, tourTitle) => {
+    Alert.alert(
+      '🔄 Resetear Contador',
+      `¿Quieres resetear el contador de "${tourTitle}" a 1 vista?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Resetear',
+          onPress: () => {
+            resetTourWatchCount(tourId);
+            setStats(getStats()); // Actualizar estadísticas
+            Alert.alert('✅ Contador reseteado', 'El contador se ha reseteado a 1 vista');
+          },
+        },
+      ]
+    );
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Image
-            source={require('../../assets/flecha_retorno.png')}
-            style={styles.backIcon}
-          />
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Text style={styles.backButtonText}>← Volver</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Historial de Tours</Text>
-        {watchedTours.length > 0 && (
-          <TouchableOpacity onPress={clearHistory}>
-            <Text style={styles.clearButton}>Limpiar</Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.placeholder} />
       </View>
 
-      {/* Stats */}
-      {watchedTours.length > 0 && (
-        <View style={styles.statsContainer}>
-          <Text style={styles.statsText}>
-            👁️ {watchedTours.length} tour{watchedTours.length !== 1 ? 's' : ''} visto
-            {watchedTours.length !== 1 ? 's' : ''}
-          </Text>
+      {/* Estadísticas */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{stats.totalTours}</Text>
+          <Text style={styles.statLabel}>Tours Únicos</Text>
         </View>
-      )}
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{stats.totalWatches}</Text>
+          <Text style={styles.statLabel}>Total Vistas</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{stats.averageWatches}</Text>
+          <Text style={styles.statLabel}>Promedio</Text>
+        </View>
+      </View>
 
-      {/* History List */}
+      {/* Lista de Tours */}
       <ScrollView style={styles.content}>
         {watchedTours.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>👀</Text>
-            <Text style={styles.emptyTitle}>No has visto ningún tour</Text>
-            <Text style={styles.emptySubtitle}>
-              ¡Explora los tours disponibles para comenzar!
+            <Text style={styles.emptyText}>👀 No has visto ningún tour aún</Text>
+            <Text style={styles.emptySubtext}>
+              Comienza a explorar para que aparezcan aquí
             </Text>
           </View>
         ) : (
-          watchedTours.map((watchedTour, index) => {
-            const timeSinceWatch = Date.now() - new Date(watchedTour.watchedAt).getTime();
-            const isRecent = timeSinceWatch < 24 * 60 * 60 * 1000;
-            const isFrequent = watchedTour.watchCount >= 3;
+          watchedTours.map((tour, index) => (
+            <View key={`${tour.tourId}-${index}`} style={styles.tourCard}>
+              <View style={styles.tourHeader}>
+                <View style={styles.tourIndex}>
+                  <Text style={styles.tourIndexText}>{index + 1}</Text>
+                </View>
+                <View style={styles.tourInfo}>
+                  <Text style={styles.tourTitle}>{tour.tourTitle}</Text>
+                  <Text style={styles.tourType}>
+                    {tour.tourType === '360' ? '🥽 Tour VR 360°' : '📱 Tour AR'}
+                  </Text>
+                </View>
+              </View>
 
-            return (
-              <TouchableOpacity
-                key={`history-${watchedTour.tourId}-${index}`}
-                style={[styles.historyCard, isRecent && styles.recentCard]}
-                onPress={() => handleTourPress(watchedTour)}
-              >
-                <View
-                  style={[
-                    styles.watchIndicator,
-                    { backgroundColor: getWatchIndicatorColor(watchedTour.watchedAt) },
-                  ]}
+              <View style={styles.tourStats}>
+                <Text style={styles.tourStat}>
+                  👁️ Visto: <Text style={styles.tourStatBold}>{tour.watchCount}</Text> {tour.watchCount === 1 ? 'vez' : 'veces'}
+                </Text>
+                <Text style={styles.tourStat}>
+                  🕒 Última vez: <Text style={styles.tourStatBold}>{getTimeAgo(tour.watchedAt)}</Text>
+                </Text>
+              </View>
+
+              <View style={styles.tourActions}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => handleResetCount(tour.tourId, tour.tourTitle)}
                 >
-                  <Text style={styles.watchIndicatorText}>👁️</Text>
-                </View>
-
-                <View style={styles.historyContent}>
-                  <Text style={styles.historyTitle}>{watchedTour.tourTitle}</Text>
-
-                  <View style={styles.historyMeta}>
-                    <Text style={styles.historyTime}>
-                      🕒 {getTimeAgo(watchedTour.watchedAt)}
-                    </Text>
-                    <Text style={styles.historyCount}>
-                      📊 {watchedTour.watchCount} {watchedTour.watchCount === 1 ? 'vez' : 'veces'}
-                    </Text>
-                  </View>
-
-                  <View style={styles.badges}>
-                    {isRecent && (
-                      <View style={styles.recentBadge}>
-                        <Text style={styles.recentBadgeText}>🔥 RECIENTE</Text>
-                      </View>
-                    )}
-                    {isFrequent && (
-                      <View style={styles.frequentBadge}>
-                        <Text style={styles.frequentBadgeText}>⭐ FAVORITO</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-
-                <Text style={styles.chevron}>›</Text>
-              </TouchableOpacity>
-            );
-          })
+                  <Text style={styles.actionButtonText}>🔄 Resetear</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.deleteButton]}
+                  onPress={() => handleRemoveTour(tour.tourId, tour.tourTitle)}
+                >
+                  <Text style={[styles.actionButtonText, styles.deleteButtonText]}>🗑️ Eliminar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
         )}
       </ScrollView>
+
+      {/* Botón Limpiar Todo */}
+      {watchedTours.length > 0 && (
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={styles.clearAllButton}
+            onPress={handleClearHistory}
+          >
+            <Text style={styles.clearAllButtonText}>🗑️ Limpiar Todo el Historial</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -136,156 +183,177 @@ const TourHistoryScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F9FAFB',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
   backButton: {
-    padding: 8,
+    padding: 5,
   },
-  backIcon: {
-    width: 20,
-    height: 20,
-    tintColor: '#111827',
+  backButtonText: {
+    fontSize: 16,
+    color: '#4F46E5',
+    fontWeight: '600',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#111827',
-    flex: 1,
-    textAlign: 'center',
   },
-  clearButton: {
-    fontSize: 14,
-    color: '#EF4444',
-    fontWeight: '600',
+  placeholder: {
+    width: 60,
   },
   statsContainer: {
-    backgroundColor: '#EEF2FF',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    padding: 20,
+    gap: 10,
   },
-  statsText: {
-    fontSize: 13,
+  statCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 15,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '700',
     color: '#4F46E5',
-    fontWeight: '600',
+    marginBottom: 5,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    padding: 20,
   },
   emptyContainer: {
+    flex: 1,
     alignItems: 'center',
-    paddingTop: 80,
+    justifyContent: 'center',
+    paddingVertical: 60,
   },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyTitle: {
+  emptyText: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
+    color: '#6B7280',
     marginBottom: 8,
   },
-  emptySubtitle: {
+  emptySubtext: {
     fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
+    color: '#9CA3AF',
   },
-  historyCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+  tourCard: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
+    padding: 15,
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 2,
   },
-  recentCard: {
-    backgroundColor: '#F0FDF4',
-    borderLeftWidth: 4,
-    borderLeftColor: '#10B981',
-  },
-  watchIndicator: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
+  tourHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 12,
+  },
+  tourIndex: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 12,
   },
-  watchIndicatorText: {
-    fontSize: 18,
+  tourIndexText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#4F46E5',
   },
-  historyContent: {
+  tourInfo: {
     flex: 1,
   },
-  historyTitle: {
-    fontSize: 15,
+  tourTitle: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#111827',
-    marginBottom: 6,
+    marginBottom: 4,
   },
-  historyMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  historyTime: {
+  tourType: {
     fontSize: 12,
     color: '#6B7280',
-    marginRight: 12,
   },
-  historyCount: {
-    fontSize: 12,
-    color: '#4F46E5',
-    fontWeight: '500',
+  tourStats: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
   },
-  badges: {
+  tourStat: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  tourStatBold: {
+    fontWeight: '600',
+    color: '#111827',
+  },
+  tourActions: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    gap: 8,
   },
-  recentBadge: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+  actionButton: {
+    flex: 1,
+    backgroundColor: '#EEF2FF',
     borderRadius: 8,
-    marginRight: 6,
+    padding: 10,
+    alignItems: 'center',
   },
-  recentBadgeText: {
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4F46E5',
+  },
+  deleteButton: {
+    backgroundColor: '#FEE2E2',
+  },
+  deleteButtonText: {
+    color: '#DC2626',
+  },
+  footer: {
+    padding: 20,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  clearAllButton: {
+    backgroundColor: '#DC2626',
+    borderRadius: 12,
+    padding: 15,
+    alignItems: 'center',
+  },
+  clearAllButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '700',
-  },
-  frequentBadge: {
-    backgroundColor: '#FCD34D',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  frequentBadgeText: {
-    color: '#92400E',
-    fontSize: 9,
-    fontWeight: '700',
-  },
-  chevron: {
-    fontSize: 24,
-    color: '#D1D5DB',
-    marginLeft: 8,
   },
 });
 

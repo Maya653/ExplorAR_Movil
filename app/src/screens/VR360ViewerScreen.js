@@ -19,6 +19,8 @@ import { DeviceMotion } from 'expo-sensors';
 // Stores
 import useTourStore from '../stores/tourStore';
 import useAnalyticsStore from '../stores/analyticsStore';
+import useTourHistoryStore from '../stores/tourHistoryStore';
+
 
 // Icons
 const CloseIcon = () => <Text style={styles.iconText}>✕</Text>;
@@ -26,7 +28,10 @@ const CloseIcon = () => <Text style={styles.iconText}>✕</Text>;
 const VR360ViewerScreen = ({ route, navigation }) => {
   // Permite pasar configuraciones opcionales desde la navegación
   const { tourId, lensRadius = 0.44, lensYOffset = 0.5, lensXOffset = 0 } = route.params;
-  
+  const { recordTourWatch } = useTourHistoryStore();
+  const hasRegisteredViewRef = useRef(false);
+
+
   const [loading, setLoading] = useState(true);
   const [startTime] = useState(Date.now());
   const [vrMode, setVrMode] = useState(false);
@@ -101,6 +106,7 @@ const VR360ViewerScreen = ({ route, navigation }) => {
     };
   }, []);
 
+  // ✅ CORREGIDO: Cargar tour al montar
   useEffect(() => {
     console.log('🎬 Iniciando VR360ViewerScreen con tourId:', tourId);
     loadTour(tourId);
@@ -110,8 +116,21 @@ const VR360ViewerScreen = ({ route, navigation }) => {
       const duration = Math.floor((Date.now() - startTime) / 1000);
       trackEvent('tour_complete', { tourId, duration, type: '360' });
     };
-  }, [tourId]);
+  }, [tourId]); // ✅ Solo depender de tourId, NO de currentTour
 
+  // ✅ NUEVO: Efecto separado para registrar visualización SOLO UNA VEZ
+  useEffect(() => {
+    // Solo registrar cuando:
+    // 1. currentTour está cargado
+    // 2. NO se ha registrado antes
+    if (currentTour && currentTour.title && !hasRegisteredViewRef.current) {
+      recordTourWatch(tourId, currentTour.title, '360');
+      hasRegisteredViewRef.current = true; // ✅ Marcar como registrado
+      console.log('✅ Tour VR 360° registrado UNA VEZ:', currentTour.title);
+    }
+  }, [currentTour]); // Solo cuando currentTour cambia
+
+  // ✅ MANTENER todos los demás useEffect sin cambios
   useEffect(() => {
     const setOrientation = async () => {
       try {

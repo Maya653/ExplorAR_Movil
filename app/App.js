@@ -1,4 +1,4 @@
-// App.js - ACTUALIZADO con nuevas pantallas
+// App.js - ACTUALIZADO
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, StatusBar, Image, AppState } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -19,16 +19,15 @@ import ARViewerScreen from './src/screens/ARViewerScreen';
 import VR360ViewerScreen from './src/screens/VR360ViewerScreen';
 import Guardados from './src/screens/Guardados';
 
-// ✅ NUEVAS PANTALLAS
+// ✅ PANTALLAS NUEVAS
 import NotificationsScreen from './src/screens/NotificationsScreen';
 import AllCareersScreen from './src/screens/AllCareersScreen';
-import TourHistoryScreen from './src/screens/TourHistoryScreen';
+import TourHistoryScreen from './src/screens/TourHistoryScreen'; // ✅ AGREGAR ESTA LÍNEA
 
 // ✅ Importar TODOS los stores
 import useAnalyticsStore from './src/stores/analyticsStore';
 import useCareerStore from './src/stores/careerStore';
 import useTourStore from './src/stores/tourStore';
-import useNotificationStore from './src/stores/notificationStore';
 
 // ✅ Importar constants
 import { ANALYTICS_CONFIG } from './src/utils/constants';
@@ -74,7 +73,12 @@ const MainStack = () => {
       <Stack.Screen name="ExplorAR" component={ExplorAR} />
       <Stack.Screen name="Guardados" component={Guardados} />
       
-      {/* ✅ Pantallas de visores */}
+      {/* ✅ NUEVAS PANTALLAS */}
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="AllCareers" component={AllCareersScreen} />
+      <Stack.Screen name="TourHistory" component={TourHistoryScreen} />
+      
+      {/* ✅ PANTALLA: ARViewerScreen - Para modelos 3D (GLB) */}
       <Stack.Screen 
         name="ARViewer" 
         component={ARViewerScreen}
@@ -83,6 +87,8 @@ const MainStack = () => {
           gestureEnabled: false,
         }}
       />
+
+      {/* ✅ NUEVA PANTALLA: VR360ViewerScreen - Para videos/fotos 360° */}
       <Stack.Screen 
         name="VR360Viewer" 
         component={VR360ViewerScreen}
@@ -91,11 +97,6 @@ const MainStack = () => {
           gestureEnabled: false,
         }}
       />
-
-      {/* ✅ NUEVAS PANTALLAS */}
-      <Stack.Screen name="Notifications" component={NotificationsScreen} />
-      <Stack.Screen name="AllCareers" component={AllCareersScreen} />
-      <Stack.Screen name="TourHistory" component={TourHistoryScreen} />
     </Stack.Navigator>
   );
 };
@@ -108,7 +109,6 @@ const App = () => {
   const sendPendingEvents = useAnalyticsStore(state => state.sendPendingEvents);
   const fetchCareers = useCareerStore(state => state.fetchCareers);
   const fetchTours = useTourStore(state => state.fetchTours);
-  const clearOldNotifications = useNotificationStore(state => state.clearOldNotifications);
 
   // ✅ Inicializar TODO al montar la app
   useEffect(() => {
@@ -121,9 +121,6 @@ const App = () => {
     console.log('📥 Pre-cargando carreras y tours...');
     fetchCareers();
     fetchTours();
-
-    // Limpiar notificaciones antiguas
-    clearOldNotifications();
   }, []);
 
   // Enviar eventos pendientes periódicamente

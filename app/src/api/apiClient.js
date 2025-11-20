@@ -2,36 +2,15 @@
 import Constants from 'expo-constants';
 
 // ============================================
-// CONFIGURACIÓN DE API BASE URL CON NGROK
+// CONFIGURACIÓN DE API BASE URL
 // ============================================
 
-/**
- * INSTRUCCIONES PARA EL EQUIPO:
- * 
- * 1. Cuando inicies el servidor backend, también inicia ngrok:
- *    Terminal 1: cd server && node index.js
- *    Terminal 2: ngrok http 5000
- * 
- * 2. Copia la URL de ngrok (ej: https://abc123.ngrok.io)
- * 
- * 3. Actualiza NGROK_URL abajo con la nueva URL
- * 
- * 4. Haz commit y push para que el equipo tenga la URL actualizada
- * 
- * 5. Todos hacen pull y reinician: npx expo start -c
- */
-
-// ⬇️ ACTUALIZA ESTA URL CUANDO REINICIES NGROK ⬇️
-const NGROK_URL = 'https://explorarmovil-production.up.railway.app';// ============================================
-// OBTENER API BASE URL
-// ============================================
+const NGROK_URL = 'https://explorarmovil-production.up.railway.app';
 
 const getApiBaseUrl = () => {
-  // Verificar si la URL de ngrok está configurada
   if (NGROK_URL.includes('YOUR-NGROK-URL')) {
     console.warn('⚠️ NGROK_URL no está configurada. Por favor actualiza src/api/apiClient.js');
     
-    // Fallback a detección automática (solo funciona en misma red)
     const debuggerHost = __DEV__ && Constants.manifest?.debuggerHost;
     if (debuggerHost) {
       const host = debuggerHost.split(':')[0];
@@ -43,13 +22,12 @@ const getApiBaseUrl = () => {
     return 'http://localhost:5000';
   }
   
-  console.log('🌐 Usando ngrok URL:', NGROK_URL);
+  console.log('🌐 Usando Railway URL:', NGROK_URL);
   return NGROK_URL;
 };
 
 const API_BASE_URL = getApiBaseUrl();
 
-// Log para debugging
 console.log('═══════════════════════════════════════');
 console.log('🚀 ExplorAR - Configuración de API');
 console.log('═══════════════════════════════════════');
@@ -58,13 +36,21 @@ console.log('🔧 Modo desarrollo:', __DEV__);
 console.log('═══════════════════════════════════════');
 
 // ============================================
-// API CLIENT
+// CONFIGURACIÓN DE REINTENTOS
 // ============================================
 
-// Timeout por defecto (30s) — se puede sobrescribir por petición pasando { timeout }
-const DEFAULT_TIMEOUT = 60000;
+const DEFAULT_TIMEOUT = 90000; // 90 segundos (Railway puede tardar)
+const DEFAULT_RETRIES = 3;     // 3 reintentos por defecto
+const RETRY_DELAY = 2000;      // 2 segundos entre reintentos
 
-// Pequeña utilidad para timeout usando AbortController
+// ============================================
+// UTILIDADES
+// ============================================
+
+// Función para esperar
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Fetch con timeout
 const timeoutFetch = (resource, options = {}, timeout = DEFAULT_TIMEOUT) => {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
@@ -73,14 +59,13 @@ const timeoutFetch = (resource, options = {}, timeout = DEFAULT_TIMEOUT) => {
     .finally(() => clearTimeout(id));
 };
 
-// Construye headers por defecto
+// Headers por defecto
 const defaultHeaders = {
   'Content-Type': 'application/json',
 };
 
 const buildUrl = (path) => {
   if (!path) return API_BASE_URL || '';
-  // Si path ya es URL absoluta, usarla tal cual
   try {
     const u = new URL(path);
     return u.toString();
@@ -109,7 +94,6 @@ const parseResponse = async (response) => {
   return data;
 };
 
-// Error helper para emular shape similar a axios
 const createHttpError = (message, { response = null, request = null, config = null } = {}) => {
   const err = new Error(message);
   if (response) err.response = response;
@@ -118,50 +102,113 @@ const createHttpError = (message, { response = null, request = null, config = nu
   return err;
 };
 
-const request = async (path, { method = 'GET', headers = {}, body = null, timeout = DEFAULT_TIMEOUT } = {}) => {
+// ============================================
+// REQUEST CON REINTENTOS
+// ============================================
+
+const request = async (
+  path, 
+  { 
+    method = 'GET', 
+    headers = {}, 
+    body = null, 
+    timeout = DEFAULT_TIMEOUT,
+    retries = DEFAULT_RETRIES, // ✅ NUEVO: Soporta reintentos
+  } = {}
+) => {
   const url = buildUrl(path);
   const finalHeaders = { ...defaultHeaders, ...headers };
-
   const config = { url, method, headers: finalHeaders, timeout };
 
-  console.log(`📤 API Request: ${method.toUpperCase()} ${url} (timeout ${timeout}ms)`);
+  // ============================================
+  // FUNCIÓN INTERNA PARA HACER UNA PETICIÓN
+  // ============================================
+  const makeRequest = async (attemptNumber) => {
+    const isRetry = attemptNumber > 1;
+    const logPrefix = isRetry ? `🔄 Intento ${attemptNumber}` : '📤';
+    
+    console.log(`${logPrefix} API Request: ${method.toUpperCase()} ${url} (timeout ${timeout}ms)`);
 
-  const options = {
-    method,
-    headers: finalHeaders,
+    const options = {
+      method,
+      headers: finalHeaders,
+    };
+
+    if (body != null && method !== 'GET' && method !== 'HEAD') {
+      if (typeof FormData !== 'undefined' && body instanceof FormData) {
+        delete options.headers['Content-Type'];
+        options.body = body;
+      } else {
+        options.body = JSON.stringify(body);
+      }
+    }
+
+    let resp;
+    try {
+      resp = await timeoutFetch(url, options, timeout);
+    } catch (err) {
+      console.error(`❌ Network/Error Request (Intento ${attemptNumber}):`, err?.message || err);
+      throw createHttpError('Network Error or timeout', { request: { url, options }, config });
+    }
+
+    const responseData = await parseResponse(resp);
+
+    if (resp.ok) {
+      console.log(`📥 API Response: ${url} - Status ${resp.status} ✅`);
+      return { data: responseData, status: resp.status, headers: resp.headers, config };
+    } else {
+      const response = { status: resp.status, data: responseData, headers: resp.headers };
+      console.error(`❌ API Error (Intento ${attemptNumber}):`, { url, status: resp.status, data: responseData });
+      throw createHttpError(`HTTP error ${resp.status}`, { response, config });
+    }
   };
 
-  if (body != null && method !== 'GET' && method !== 'HEAD') {
-    // Si el body ya es FormData, no serializar
-    if (typeof FormData !== 'undefined' && body instanceof FormData) {
-      delete options.headers['Content-Type'];
-      options.body = body;
-    } else {
-      options.body = JSON.stringify(body);
+  // ============================================
+  // LÓGICA DE REINTENTOS
+  // ============================================
+  
+  let lastError;
+  let currentDelay = RETRY_DELAY;
+  
+  for (let attempt = 1; attempt <= retries + 1; attempt++) {
+    try {
+      const result = await makeRequest(attempt);
+      
+      if (attempt > 1) {
+        console.log(`✅ Petición exitosa después de ${attempt} intentos`);
+      }
+      return result;
+      
+    } catch (error) {
+      lastError = error;
+      
+      // Verificar si debemos reintentar
+      const shouldRetry = attempt <= retries && (
+        error.message.includes('timeout') || 
+        error.message.includes('Network')
+      );
+      
+      if (shouldRetry) {
+        console.log(`⏳ Esperando ${currentDelay}ms antes de reintentar... (${attempt}/${retries})`);
+        await wait(currentDelay);
+        
+        // Backoff exponencial
+        currentDelay = Math.min(currentDelay * 1.5, 10000);
+      } else {
+        if (attempt > 1) {
+          console.error(`❌ Petición falló después de ${attempt} intentos`);
+        }
+        throw lastError;
+      }
     }
   }
-
-  let resp;
-  try {
-    resp = await timeoutFetch(url, options, timeout);
-  } catch (err) {
-    // Abort o fallo de red
-    console.error('❌ Network/Error Request:', err?.message || err);
-    throw createHttpError('Network Error or timeout', { request: { url, options }, config });
-  }
-
-  const responseData = await parseResponse(resp);
-
-  console.log(`📥 API Response: ${url} - Status ${resp.status}`);
-
-  if (!resp.ok) {
-    const response = { status: resp.status, data: responseData, headers: resp.headers };
-    console.error('❌ API Error:', { url, status: resp.status, data: responseData });
-    throw createHttpError(`HTTP error ${resp.status}`, { response, config });
-  }
-
-  return { data: responseData, status: resp.status, headers: resp.headers, config };
+  
+  throw lastError;
 };
+
+// ============================================
+// API CLIENT
+// ============================================
 
 const apiClient = {
   get: (path, config = {}) => request(path, { ...config, method: 'GET' }),

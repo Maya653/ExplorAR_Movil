@@ -65,6 +65,8 @@ const ARViewerScreen = ({ route, navigation }) => {
   const [modelLoaded, setModelLoaded] = useState(false);
   const [sensorControl, setSensorControl] = useState(false); // Iniciar en modo táctil
   const [showUI, setShowUI] = useState(true); // Control de visibilidad de UI
+  const hasRegisteredViewRef = useRef(false);
+
   
   // Estados simplificados
   const [currentSessionTime, setCurrentSessionTime] = useState(0);
@@ -72,8 +74,8 @@ const ARViewerScreen = ({ route, navigation }) => {
   // Stores
   const { currentTour, loadTour, loading, error, pauseTour, resumeTour, completeTour } = useTourStore();
   const { trackEvent } = useAnalyticsStore();
-  const { markTourAsWatched, getTourWatchInfo } = useTourHistoryStore();
-  
+  const { recordTourWatch, getTourWatchInfo } = useTourHistoryStore();
+
   // Estado para información de visualización anterior
   const [lastWatchInfo, setLastWatchInfo] = useState(null);
   
@@ -103,19 +105,13 @@ const ARViewerScreen = ({ route, navigation }) => {
   // EFECTOS
   // ============================================
   
-  // Cargar tour al montar
+// ✅ CORREGIDO: Cargar tour al montar
   useEffect(() => {
     console.log('🎬 Iniciando ARViewerScreen con tourId:', tourId);
     loadTour(tourId);
     
     // Track: Tour iniciado
     trackEvent('tour_start', { tourId });
-    
-    // Marcar como visto cuando se inicia el tour
-    if (currentTour?.title) {
-      markTourAsWatched(tourId, currentTour.title);
-      console.log('📹 Tour marcado como visto:', currentTour.title);
-    }
     
     // Cleanup al desmontar
     return () => {
@@ -134,15 +130,20 @@ const ARViewerScreen = ({ route, navigation }) => {
         interactions,
       });
     };
-  }, [tourId]);
+  }, [tourId]); // ✅ Solo depender de tourId, NO de currentTour
 
-  // Marcar como visto cuando se carga el tour
+
+// ✅ NUEVO: Efecto separado para registrar visualización SOLO UNA VEZ
   useEffect(() => {
-    if (currentTour && tourId) {
-      markTourAsWatched(tourId, currentTour.title);
-      console.log('📹 Tour marcado como visto:', currentTour.title);
+    // Solo registrar cuando:
+    // 1. currentTour está cargado
+    // 2. NO se ha registrado antes
+    if (currentTour && currentTour.title && !hasRegisteredViewRef.current) {
+      recordTourWatch(tourId, currentTour.title, 'ar');
+      hasRegisteredViewRef.current = true; // ✅ Marcar como registrado
+      console.log('✅ Tour AR registrado UNA VEZ:', currentTour.title);
     }
-  }, [currentTour, tourId]);
+  }, [currentTour]); // Solo cuando currentTour cambia
 
   // Cargar información de visualización anterior
   useEffect(() => {
