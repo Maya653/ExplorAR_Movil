@@ -1,8 +1,68 @@
 // src/api/apiClient.js
-import { API_BASE_URL } from '../utils/constants';
+import Constants from 'expo-constants';
+
+// ============================================
+// CONFIGURACIÓN DE API BASE URL CON NGROK
+// ============================================
+
+/**
+ * INSTRUCCIONES PARA EL EQUIPO:
+ * 
+ * 1. Cuando inicies el servidor backend, también inicia ngrok:
+ *    Terminal 1: cd server && node index.js
+ *    Terminal 2: ngrok http 5000
+ * 
+ * 2. Copia la URL de ngrok (ej: https://abc123.ngrok.io)
+ * 
+ * 3. Actualiza NGROK_URL abajo con la nueva URL
+ * 
+ * 4. Haz commit y push para que el equipo tenga la URL actualizada
+ * 
+ * 5. Todos hacen pull y reinician: npx expo start -c
+ */
+
+// ⬇️ ACTUALIZA ESTA URL CUANDO REINICIES NGROK ⬇️
+const NGROK_URL = 'https://explorarmovil-production.up.railway.app';// ============================================
+// OBTENER API BASE URL
+// ============================================
+
+const getApiBaseUrl = () => {
+  // Verificar si la URL de ngrok está configurada
+  if (NGROK_URL.includes('YOUR-NGROK-URL')) {
+    console.warn('⚠️ NGROK_URL no está configurada. Por favor actualiza src/api/apiClient.js');
+    
+    // Fallback a detección automática (solo funciona en misma red)
+    const debuggerHost = __DEV__ && Constants.manifest?.debuggerHost;
+    if (debuggerHost) {
+      const host = debuggerHost.split(':')[0];
+      const fallbackUrl = `http://${host}:5000`;
+      console.log('📡 Usando detección automática (solo funciona en misma red):', fallbackUrl);
+      return fallbackUrl;
+    }
+    
+    return 'http://localhost:5000';
+  }
+  
+  console.log('🌐 Usando ngrok URL:', NGROK_URL);
+  return NGROK_URL;
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Log para debugging
+console.log('═══════════════════════════════════════');
+console.log('🚀 ExplorAR - Configuración de API');
+console.log('═══════════════════════════════════════');
+console.log('📡 API Base URL:', API_BASE_URL);
+console.log('🔧 Modo desarrollo:', __DEV__);
+console.log('═══════════════════════════════════════');
+
+// ============================================
+// API CLIENT
+// ============================================
 
 // Timeout por defecto (30s) — se puede sobrescribir por petición pasando { timeout }
-const DEFAULT_TIMEOUT = 30000;
+const DEFAULT_TIMEOUT = 60000;
 
 // Pequeña utilidad para timeout usando AbortController
 const timeoutFetch = (resource, options = {}, timeout = DEFAULT_TIMEOUT) => {
@@ -112,3 +172,4 @@ const apiClient = {
 };
 
 export default apiClient;
+export { API_BASE_URL };
