@@ -39,7 +39,7 @@ const CarreraScreen = ({ route, navigation }) => {
 	const { career } = route.params || {};
 	
 	// Zustand stores
-	const { tours, fetchTours, getToursByCareer } = useTourStore();
+	const { tours, fetchTours } = useTourStore();
 	const { trackScreenView, trackTourStart } = useAnalyticsStore();
 	
 	const [loading, setLoading] = useState(true);
@@ -52,55 +52,71 @@ const CarreraScreen = ({ route, navigation }) => {
 		loadTours();
 	}, [career]);
 
+	// ✅ FUNCIÓN CORREGIDA: Filtrar solo tours de esta carrera
 	const loadTours = async () => {
 		setLoading(true);
 		try {
 			await fetchTours();
 			
 			if (career?.id || career?._id) {
-				const filtered = getToursByCareer(career.id || career._id);
-				setCareerTours(filtered.length > 0 ? filtered : tours);
+				const careerId = career.id || career._id;
+				
+				// ✅ Filtrar SOLO los tours asignados a esta carrera
+				const filtered = tours.filter(tour => {
+					const tourCareerId = tour.careerId || tour.career;
+					const match = String(tourCareerId) === String(careerId);
+					
+					if (match) {
+						console.log(`✅ Tour "${tour.title}" pertenece a "${career.title}"`);
+					}
+					
+					return match;
+				});
+				
+				console.log(`📊 ${filtered.length} tours encontrados para "${career.title}"`);
+				setCareerTours(filtered);
 			} else {
+				console.warn('⚠️ Carrera sin ID, mostrando todos los tours');
 				setCareerTours(tours);
 			}
 		} catch (error) {
-			console.error('Error cargando tours:', error);
+			console.error('❌ Error cargando tours:', error);
 			setCareerTours([]);
 		} finally {
 			setLoading(false);
 		}
 	};
 
-	// ✅ FUNCIÓN ACTUALIZADA PARA NAVEGAR AL VISOR AR
+	// ✅ FUNCIÓN PARA NAVEGAR AL VISOR AR
 	const handleTourPress = (tour) => {
-	console.log('🎬 Tour seleccionado:', tour.title);
-	console.log('📋 Tipo de tour:', tour.type);
-	
-	// Registrar analytics
-	trackTourStart(tour.id || tour._id, tour.title, career?.id || career?._id);
-	
-	// Detectar tipo de tour
-	const tourType = tour.type?.toLowerCase();
-	
-	if (tourType === 'vr' || tourType === '360' || tourType === 'vr360') {
-		// Tours VR 360°
-		console.log('🥽 Navegando a visor VR 360°');
-		navigation.navigate('VR360Viewer', {
-		tourId: tour.id || tour._id,
-		tourTitle: tour.title,
-		careerId: career?.id || career?._id,
-		careerTitle: career?.title,
-		});
-	} else {
-		// Tours 3D
-		console.log('🎨 Navegando a visor 3D');
-		navigation.navigate('ARViewer', {
-		tourId: tour.id || tour._id,
-		tourTitle: tour.title,
-		careerId: career?.id || career?._id,
-		careerTitle: career?.title,
-		});
-	}
+		console.log('🎬 Tour seleccionado:', tour.title);
+		console.log('📋 Tipo de tour:', tour.type);
+		
+		// Registrar analytics
+		trackTourStart(tour.id || tour._id, tour.title, career?.id || career?._id);
+		
+		// Detectar tipo de tour
+		const tourType = tour.type?.toLowerCase();
+		
+		if (tourType === 'vr' || tourType === '360' || tourType === 'vr360') {
+			// Tours VR 360°
+			console.log('🥽 Navegando a visor VR 360°');
+			navigation.navigate('VR360Viewer', {
+				tourId: tour.id || tour._id,
+				tourTitle: tour.title,
+				careerId: career?.id || career?._id,
+				careerTitle: career?.title,
+			});
+		} else {
+			// Tours 3D
+			console.log('🎨 Navegando a visor 3D');
+			navigation.navigate('ARViewer', {
+				tourId: tour.id || tour._id,
+				tourTitle: tour.title,
+				careerId: career?.id || career?._id,
+				careerTitle: career?.title,
+			});
+		}
 	};
 
 	return (
@@ -129,7 +145,8 @@ const CarreraScreen = ({ route, navigation }) => {
 						</View>
 						<View style={styles.statItem}> 
 							<Image source={require('../../assets/icono_grupo.png')} style={styles.statIconImg} />
-							<Text style={styles.statText}>{career?.reviews || career?.tours || '—'}</Text>
+							{/* ✅ Mostrar contador real de tours */}
+							<Text style={styles.statText}>{careerTours.length} tours</Text>
 						</View>
 						<View style={styles.statItem}>
 							<ClockIcon />
@@ -158,19 +175,23 @@ const CarreraScreen = ({ route, navigation }) => {
 						<ActivityIndicator size="large" color="#4F46E5" style={{ marginTop: 24 }} />
 					) : (
 						<View style={styles.grid}>
+							{/* ✅ Mensaje cuando NO hay tours asignados */}
 							{careerTours.length === 0 ? (
 								<View style={styles.emptyState}>
 									<Text style={styles.emptyIcon}>🎓</Text>
-									<Text style={styles.emptyText}>No hay tours disponibles para esta carrera</Text>
+									<Text style={styles.emptyText}>
+										Aún no hay tours para esta carrera
+									</Text>
 									<Text style={[styles.emptyText, { fontSize: 14, marginTop: 4, opacity: 0.7 }]}>
-										Pronto habrá contenido AR disponible
+										Los tours se agregarán próximamente
 									</Text>
 								</View>
 							) : (
+								/* ✅ Mostrar SOLO tours asignados */
 								careerTours.map((t, idx) => {
 									const colors = CARD_COLORS[idx % CARD_COLORS.length];
 									const badge = t.type || t.mode || 'AR';
-									const progress = t.progress || Math.floor(Math.random() * 100); // Progreso aleatorio si no existe
+									const progress = t.progress || Math.floor(Math.random() * 100);
 									
 									return (
 										<TouchableOpacity 

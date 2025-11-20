@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import useAnalyticsStore from '../stores/analyticsStore';
-import apiClient from '../api/apiClient'; // ✅ USAR EL CLIENTE API CENTRAL
+import apiClient from '../api/apiClient';
 
 // Helpers
 const getYouTubeIdFromUrl = (url) => {
@@ -59,8 +59,10 @@ const ExplorAR = ({ navigation }) => {
       try {
         console.log('📥 Cargando testimonios...');
         
-        // ✅ USAR EL CLIENTE API CENTRAL (que ya tiene Railway configurado)
-        const response = await apiClient.get('/api/testimonios');
+        // ✅ AUMENTAR TIMEOUT A 60 SEGUNDOS
+        const response = await apiClient.get('/api/testimonios', {
+          timeout: 60000 // ← CAMBIO AQUÍ: de 30000 a 60000
+        });
         
         if (response.data && Array.isArray(response.data)) {
           console.log(`✅ ${response.data.length} testimonios cargados`);
