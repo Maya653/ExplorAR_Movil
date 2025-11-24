@@ -1,4 +1,4 @@
-// src/screens/AllCareersScreen.js
+// src/screens/AllCareersScreen.js - ACTUALIZADO CON COLORES INSTITUCIONALES CUORH
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -12,12 +12,29 @@ import {
   TextInput,
   ActivityIndicator,
   RefreshControl,
+  Platform,
+  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import useCareerStore from '../stores/careerStore';
 import useTourStore from '../stores/tourStore';
 import useAnalyticsStore from '../stores/analyticsStore';
 import { SearchIcon } from '../../components/Icons';
+
+// ✅ COLORES INSTITUCIONALES CUORH
+const COLORS = {
+  primary: '#8A8D00',      // PANTONE 392 C - Verde olivo
+  secondary: '#041E42',    // PANTONE 296 C - Azul marino
+  white: '#FFFFFF',
+  lightText: '#E5E7EB',
+  mutedText: '#9CA3AF',
+  accent: '#4F46E5',
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#EF4444',
+};
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const AllCareersScreen = ({ navigation }) => {
   const { careers, loading, fetchCareers, searchCareers } = useCareerStore();
@@ -128,10 +145,10 @@ const AllCareersScreen = ({ navigation }) => {
   }, {});
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
 
-      {/* Header */}
+      {/* ✅ HEADER CON COLOR INSTITUCIONAL */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Image
@@ -145,25 +162,27 @@ const AllCareersScreen = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <SearchIcon size={20} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Buscar carreras..."
-          placeholderTextColor="#6B7280"
-          value={searchText}
-          onChangeText={setSearchText}
-          returnKeyType="search"
-        />
-        {searchText.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchText('')}>
-            <Text style={styles.clearSearch}>×</Text>
-          </TouchableOpacity>
-        )}
+      {/* ✅ SEARCH BAR */}
+      <View style={styles.searchWrapper}>
+        <View style={styles.searchContainer}>
+          <SearchIcon size={20} color={COLORS.secondary} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar carreras..."
+            placeholderTextColor="#6B7280"
+            value={searchText}
+            onChangeText={setSearchText}
+            returnKeyType="search"
+          />
+          {searchText.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchText('')}>
+              <Text style={styles.clearSearch}>×</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      {/* Sort Options */}
+      {/* ✅ SORT OPTIONS */}
       <View style={styles.sortContainer}>
         <Text style={styles.sortLabel}>Ordenar por:</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -196,21 +215,23 @@ const AllCareersScreen = ({ navigation }) => {
         </ScrollView>
       </View>
 
-      {/* Careers List */}
+      {/* ✅ CAREERS LIST */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4F46E5" />
+          <ActivityIndicator size="large" color={COLORS.white} />
           <Text style={styles.loadingText}>Cargando carreras...</Text>
         </View>
       ) : (
         <ScrollView
           style={styles.content}
+          contentContainerStyle={styles.contentContainer}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              colors={['#4F46E5']}
-              tintColor="#4F46E5"
+              colors={[COLORS.primary]}
+              tintColor={COLORS.white}
+              progressBackgroundColor={COLORS.secondary}
             />
           }
         >
@@ -346,112 +367,144 @@ const AllCareersScreen = ({ navigation }) => {
           )}
         </ScrollView>
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: COLORS.secondary,
   },
+  
+  // ✅ HEADER CON COLOR INSTITUCIONAL
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 12 : 50,
+    paddingBottom: 16,
+    backgroundColor: COLORS.primary,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
   },
   backButton: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backIcon: {
     width: 20,
     height: 20,
-    tintColor: '#111827',
+    tintColor: COLORS.white,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#111827',
+    color: COLORS.white,
     flex: 1,
     textAlign: 'center',
+    marginHorizontal: 10,
   },
   headerRight: {
-    width: 36,
-    alignItems: 'flex-end',
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   careerCount: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#4F46E5',
+    color: COLORS.white,
+  },
+  
+  // ✅ SEARCH BAR
+  searchWrapper: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    backgroundColor: COLORS.secondary,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginVertical: 12,
+    backgroundColor: COLORS.white,
     paddingHorizontal: 16,
     borderRadius: 12,
-    height: 44,
+    height: 46,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: '#111827',
-    marginLeft: 8,
+    color: COLORS.secondary,
+    marginLeft: 10,
   },
   clearSearch: {
-    fontSize: 28,
-    color: '#D1D5DB',
+    fontSize: 30,
+    color: COLORS.mutedText,
     fontWeight: '300',
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
   },
+  
+  // ✅ SORT OPTIONS
   sortContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingBottom: 16,
+    backgroundColor: COLORS.secondary,
   },
   sortLabel: {
     fontSize: 13,
-    color: '#6B7280',
+    color: COLORS.lightText,
     fontWeight: '600',
     marginRight: 12,
   },
   sortButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
     borderRadius: 16,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   sortButtonActive: {
-    backgroundColor: '#4F46E5',
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   sortText: {
     fontSize: 13,
-    color: '#6B7280',
+    color: COLORS.mutedText,
     fontWeight: '600',
   },
   sortTextActive: {
-    color: '#FFFFFF',
+    color: COLORS.white,
   },
+  
+  // ✅ CONTENT
   content: {
     flex: 1,
+  },
+  contentContainer: {
     paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
   },
   loadingContainer: {
     flex: 1,
@@ -459,98 +512,106 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#6B7280',
+    marginTop: 16,
+    fontSize: 15,
+    color: COLORS.lightText,
   },
+  
+  // ✅ EMPTY STATE
   emptyContainer: {
     alignItems: 'center',
-    paddingTop: 80,
-    paddingHorizontal: 32,
+    paddingTop: 100,
+    paddingHorizontal: 40,
   },
   emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
+    fontSize: 72,
+    marginBottom: 20,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
-    marginBottom: 8,
+    color: COLORS.white,
+    marginBottom: 10,
     textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#6B7280',
+    color: COLORS.lightText,
     textAlign: 'center',
   },
+  
+  // ✅ CATEGORY SECTION
   categorySection: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   categoryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#EEF2FF',
+    paddingVertical: 10,
+    backgroundColor: 'rgba(138, 141, 0, 0.15)',
     borderLeftWidth: 4,
-    borderLeftColor: '#4F46E5',
+    borderLeftColor: COLORS.primary,
+    marginBottom: 8,
   },
   categoryTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#4F46E5',
+    color: COLORS.primary,
   },
   categoryCount: {
     fontSize: 12,
-    color: '#6B7280',
+    color: COLORS.lightText,
     fontWeight: '600',
   },
+  
+  // ✅ CAREER CARDS
   careerCard: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.white,
     marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 12,
+    marginBottom: 10,
+    borderRadius: 14,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
   },
   careerAccent: {
-    width: 4,
+    width: 5,
   },
   careerContent: {
     flex: 1,
-    padding: 12,
+    padding: 14,
   },
   careerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   careerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: COLORS.secondary,
     flex: 1,
     marginRight: 8,
+    lineHeight: 22,
   },
   highlightBadge: {
     padding: 4,
   },
   highlightText: {
-    fontSize: 16,
+    fontSize: 18,
   },
   careerDescription: {
     fontSize: 13,
     color: '#6B7280',
-    lineHeight: 18,
-    marginBottom: 8,
+    lineHeight: 19,
+    marginBottom: 10,
   },
   careerFooter: {
     flexDirection: 'row',
@@ -559,36 +620,40 @@ const styles = StyleSheet.create({
   },
   categoryBadge: {
     backgroundColor: '#EEF2FF',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: 12,
   },
   categoryBadgeText: {
     fontSize: 11,
-    color: '#4F46E5',
+    color: COLORS.accent,
     fontWeight: '600',
   },
   tourCountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
   },
   tourCountIcon: {
     fontSize: 14,
-    marginRight: 4,
+    marginRight: 5,
   },
   tourCountText: {
     fontSize: 12,
-    color: '#10B981',
+    color: COLORS.success,
     fontWeight: '600',
   },
   noToursText: {
-    color: '#EF4444',
+    color: COLORS.error,
   },
   chevron: {
-    fontSize: 24,
-    color: '#D1D5DB',
+    fontSize: 28,
+    color: COLORS.mutedText,
     alignSelf: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
 });
 

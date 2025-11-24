@@ -1,4 +1,4 @@
-// src/screens/CarreraScreen.js
+// src/screens/CarreraScreen.js - ACTUALIZADO CON COLORES INSTITUCIONALES CUORH
 import React, { useState, useEffect } from 'react';
 import {
 	View,
@@ -10,6 +10,8 @@ import {
 	Image,
 	ScrollView,
 	ActivityIndicator,
+	Platform,
+	Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -22,6 +24,21 @@ import {
 // Importar stores
 import useTourStore from '../stores/tourStore';
 import useAnalyticsStore from '../stores/analyticsStore';
+
+// ✅ COLORES INSTITUCIONALES CUORH
+const COLORS = {
+	primary: '#8A8D00',      // PANTONE 392 C - Verde olivo
+	secondary: '#041E42',    // PANTONE 296 C - Azul marino
+	white: '#FFFFFF',
+	lightText: '#E5E7EB',
+	mutedText: '#9CA3AF',
+	accent: '#4F46E5',
+	success: '#10B981',
+	warning: '#F59E0B',
+	error: '#EF4444',
+};
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Colores elegantes para las cartas de tours
 const CARD_COLORS = [
@@ -120,10 +137,14 @@ const CarreraScreen = ({ route, navigation }) => {
 	};
 
 	return (
-		<SafeAreaView style={styles.container}>
-			<StatusBar barStyle="light-content" translucent={false} />
+		<View style={styles.container}>
+			<StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
 
-			<LinearGradient colors={["#1E3A8A", "#3730A3"]} style={styles.header}>
+			{/* ✅ HEADER CON GRADIENTE INSTITUCIONAL */}
+			<LinearGradient 
+				colors={[COLORS.primary, COLORS.secondary]} 
+				style={styles.header}
+			>
 				<View style={styles.headerTop}>
 					<TouchableOpacity style={styles.iconCircle} onPress={() => navigation.goBack()}>
 						<Image
@@ -132,7 +153,7 @@ const CarreraScreen = ({ route, navigation }) => {
 						/>
 					</TouchableOpacity>
 					<TouchableOpacity style={styles.iconCircleRight}>
-						<HeartIcon size={20} color={'#FFFFFF'} />
+						<HeartIcon size={20} color={COLORS.white} />
 					</TouchableOpacity>
 				</View>
 
@@ -156,6 +177,7 @@ const CarreraScreen = ({ route, navigation }) => {
 				</View>
 			</LinearGradient>
 
+			{/* ✅ CONTENIDO CON FONDO AZUL MARINO */}
 			<View style={styles.contentCard}>
 				<View style={styles.tabsRow}>
 					<View style={styles.tabActive}>
@@ -168,11 +190,11 @@ const CarreraScreen = ({ route, navigation }) => {
 
 				<ScrollView 
 					style={{ marginTop: 12 }} 
-					contentContainerStyle={{ paddingBottom: 60, paddingTop: 8 }}
+					contentContainerStyle={{ paddingBottom: Platform.OS === 'ios' ? 80 : 60, paddingTop: 8 }}
 					showsVerticalScrollIndicator={false}
 				>
 					{loading ? (
-						<ActivityIndicator size="large" color="#4F46E5" style={{ marginTop: 24 }} />
+						<ActivityIndicator size="large" color={COLORS.white} style={{ marginTop: 24 }} />
 					) : (
 						<View style={styles.grid}>
 							{/* ✅ Mensaje cuando NO hay tours asignados */}
@@ -234,7 +256,7 @@ const CarreraScreen = ({ route, navigation }) => {
 														onPress={() => handleTourPress(t)}
 														activeOpacity={0.8}
 													>
-														<PlayIcon size={20} color={'#FFFFFF'} />
+														<PlayIcon size={20} color={COLORS.white} />
 													</TouchableOpacity>
 												</View>
 											</LinearGradient>
@@ -246,69 +268,156 @@ const CarreraScreen = ({ route, navigation }) => {
 					)}
 				</ScrollView>
 			</View>
-		</SafeAreaView>
+		</View>
 	);
 };
 
 const styles = StyleSheet.create({
-	container: { flex: 1, backgroundColor: '#F3F4F6' },
+	container: { 
+		flex: 1, 
+		backgroundColor: COLORS.secondary,
+	},
+	
+	// ✅ HEADER CON COLORES INSTITUCIONALES
 	header: {
 		height: 260,
 		paddingHorizontal: 16,
-		paddingTop: 12,
+		paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 16 : 50,
 		borderBottomLeftRadius: 24,
 		borderBottomRightRadius: 24,
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.2,
+		shadowRadius: 8,
+		elevation: 8,
 	},
-	headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+	headerTop: { 
+		flexDirection: 'row', 
+		justifyContent: 'space-between', 
+		alignItems: 'center',
+		marginBottom: 16,
+	},
 	iconCircle: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		backgroundColor: 'rgba(255,255,255,0.12)',
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		backgroundColor: 'rgba(255,255,255,0.15)',
 		alignItems: 'center',
 		justifyContent: 'center',
+		borderWidth: 1,
+		borderColor: 'rgba(255,255,255,0.2)',
 	},
 	iconCircleRight: {
-		width: 40,
-		height: 40,
-		borderRadius: 20,
-		backgroundColor: 'rgba(255,255,255,0.12)',
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		backgroundColor: 'rgba(255,255,255,0.15)',
 		alignItems: 'center',
 		justifyContent: 'center',
+		borderWidth: 1,
+		borderColor: 'rgba(255,255,255,0.2)',
 	},
-	smallIcon: { width: 18, height: 18, tintColor: '#fff' },
-	headerBody: { marginTop: 16 },
-	title: { color: '#FFFFFF', fontSize: 28, fontWeight: '700', marginBottom: 12 },
-	statsRow: { flexDirection: 'row', alignItems: 'center' },
-	statItem: { flexDirection: 'row', alignItems: 'center', marginRight: 16 },
-	statText: { color: '#FFFFFF', marginLeft: 8 },
-	statIconImg: { width: 16, height: 16, tintColor: '#FFFFFF' },
+	smallIcon: { 
+		width: 20, 
+		height: 20, 
+		tintColor: COLORS.white,
+	},
+	headerBody: { 
+		marginTop: 8,
+		flex: 1,
+		justifyContent: 'center',
+	},
+	title: { 
+		color: COLORS.white, 
+		fontSize: 30, 
+		fontWeight: '700', 
+		marginBottom: 16,
+		textShadowColor: 'rgba(0, 0, 0, 0.3)',
+		textShadowOffset: { width: 0, height: 2 },
+		textShadowRadius: 4,
+	},
+	statsRow: { 
+		flexDirection: 'row', 
+		alignItems: 'center',
+		flexWrap: 'wrap',
+	},
+	statItem: { 
+		flexDirection: 'row', 
+		alignItems: 'center', 
+		marginRight: 20,
+		marginBottom: 8,
+		backgroundColor: 'rgba(255, 255, 255, 0.1)',
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 12,
+	},
+	statText: { 
+		color: COLORS.white, 
+		marginLeft: 8,
+		fontSize: 14,
+		fontWeight: '600',
+	},
+	statIconImg: { 
+		width: 18, 
+		height: 18, 
+		tintColor: COLORS.white,
+	},
 
+	// ✅ CONTENIDO
 	contentCard: {
 		flex: 1,
 		marginTop: -40,
 		paddingHorizontal: 16,
 	},
-	tabsRow: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 8, overflow: 'hidden', elevation: 2 },
-	tabActive: { flex: 1, padding: 14, alignItems: 'center', borderBottomColor: '#4F46E5', borderBottomWidth: 3 },
-	tabActiveText: { color: '#4F46E5', fontWeight: '600' },
-	tabInactive: { flex: 1, padding: 14, alignItems: 'center' },
-	tabInactiveText: { color: '#6B7280', fontWeight: '600' },
+	tabsRow: { 
+		flexDirection: 'row', 
+		backgroundColor: COLORS.white, 
+		borderRadius: 12, 
+		overflow: 'hidden', 
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 8,
+		elevation: 4,
+	},
+	tabActive: { 
+		flex: 1, 
+		padding: 16, 
+		alignItems: 'center', 
+		borderBottomColor: COLORS.primary,
+		borderBottomWidth: 3,
+	},
+	tabActiveText: { 
+		color: COLORS.primary, 
+		fontWeight: '700',
+		fontSize: 15,
+	},
+	tabInactive: { 
+		flex: 1, 
+		padding: 16, 
+		alignItems: 'center',
+	},
+	tabInactiveText: { 
+		color: COLORS.mutedText, 
+		fontWeight: '600',
+		fontSize: 15,
+	},
 
+	// ✅ GRID DE TOURS
 	grid: { 
 		marginTop: 16, 
 		paddingHorizontal: 4,
 	},
 	card: {
 		width: '100%',
-		height: 180,
-		borderRadius: 16,
+		height: 190,
+		borderRadius: 18,
 		padding: 20,
-		marginBottom: 16,
+		marginBottom: 18,
 		justifyContent: 'space-between',
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.15,
+		shadowOpacity: 0.2,
 		shadowRadius: 12,
 		elevation: 8,
 	},
@@ -319,20 +428,20 @@ const styles = StyleSheet.create({
 		marginBottom: 12,
 	},
 	cardBadge: {
-		backgroundColor: 'rgba(255,255,255,0.9)',
-		paddingHorizontal: 12,
-		paddingVertical: 6,
+		backgroundColor: 'rgba(255,255,255,0.95)',
+		paddingHorizontal: 14,
+		paddingVertical: 7,
 		borderRadius: 20,
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
+		shadowOpacity: 0.15,
 		shadowRadius: 4,
-		elevation: 3,
+		elevation: 4,
 	},
 	badgeText: { 
 		fontSize: 13, 
 		fontWeight: '700', 
-		color: '#111827',
+		color: COLORS.secondary,
 		letterSpacing: 0.5,
 	},
 	cardContent: {
@@ -340,19 +449,20 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	cardTitle: { 
-		color: '#ffffff', 
-		fontSize: 18, 
+		color: COLORS.white, 
+		fontSize: 19, 
 		fontWeight: '700',
 		marginBottom: 8,
-		lineHeight: 24,
-		textShadowColor: 'rgba(0,0,0,0.3)',
+		lineHeight: 26,
+		textShadowColor: 'rgba(0,0,0,0.4)',
 		textShadowOffset: { width: 0, height: 1 },
-		textShadowRadius: 2,
+		textShadowRadius: 3,
 	},
 	cardMeta: { 
-		color: 'rgba(255,255,255,0.9)', 
+		color: 'rgba(255,255,255,0.95)', 
 		fontSize: 14,
 		fontWeight: '500',
+		lineHeight: 20,
 		textShadowColor: 'rgba(0,0,0,0.3)',
 		textShadowOffset: { width: 0, height: 1 },
 		textShadowRadius: 2,
@@ -365,62 +475,66 @@ const styles = StyleSheet.create({
 	},
 	cardProgress: {
 		flex: 1,
-		marginRight: 12,
+		marginRight: 14,
 	},
 	progressText: {
-		color: 'rgba(255,255,255,0.8)',
+		color: 'rgba(255,255,255,0.85)',
 		fontSize: 12,
-		marginBottom: 4,
+		marginBottom: 6,
+		fontWeight: '500',
 	},
 	progressBar: {
-		height: 4,
+		height: 5,
 		backgroundColor: 'rgba(255,255,255,0.3)',
-		borderRadius: 2,
+		borderRadius: 3,
 		overflow: 'hidden',
 	},
 	progressFill: {
 		height: '100%',
-		backgroundColor: '#ffffff',
-		borderRadius: 2,
+		backgroundColor: COLORS.white,
+		borderRadius: 3,
 	},
 	playFloating: {
-		width: 48,
-		height: 48,
-		borderRadius: 24,
-		backgroundColor: 'rgba(255,255,255,0.15)',
+		width: 52,
+		height: 52,
+		borderRadius: 26,
+		backgroundColor: 'rgba(255,255,255,0.2)',
 		alignItems: 'center',
 		justifyContent: 'center',
 		borderWidth: 2,
-		borderColor: 'rgba(255,255,255,0.3)',
+		borderColor: 'rgba(255,255,255,0.4)',
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.15,
+		shadowOpacity: 0.2,
 		shadowRadius: 8,
 		elevation: 6,
 	},
+	
+	// ✅ EMPTY STATE
 	emptyState: {
 		width: '100%',
-		paddingVertical: 60,
+		paddingVertical: 70,
 		alignItems: 'center',
-		backgroundColor: '#FFFFFF',
-		borderRadius: 16,
+		backgroundColor: COLORS.white,
+		borderRadius: 18,
 		marginTop: 20,
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 4 },
 		shadowOpacity: 0.1,
-		shadowRadius: 8,
+		shadowRadius: 12,
 		elevation: 4,
 	},
 	emptyText: {
 		fontSize: 16,
-		color: '#6B7280',
+		color: COLORS.mutedText,
 		textAlign: 'center',
 		fontWeight: '500',
 		marginTop: 12,
+		paddingHorizontal: 24,
 	},
 	emptyIcon: {
-		fontSize: 48,
-		marginBottom: 8,
+		fontSize: 56,
+		marginBottom: 12,
 	},
 });
 

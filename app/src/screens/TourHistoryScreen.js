@@ -1,4 +1,4 @@
-// src/screens/TourHistoryScreen.js
+// src/screens/TourHistoryScreen.js - ACTUALIZADO CON COLORES INSTITUCIONALES CUORH
 // Pantalla para ver y gestionar el historial de tours vistos
 
 import React, { useState, useEffect } from 'react';
@@ -10,9 +10,27 @@ import {
   ScrollView,
   Alert,
   SafeAreaView,
+  Platform,
+  StatusBar,
+  Dimensions,
 } from 'react-native';
 import useTourHistoryStore from '../stores/tourHistoryStore';
 import { getTimeAgo } from '../utils/timeUtils';
+
+// ✅ COLORES INSTITUCIONALES CUORH
+const COLORS = {
+  primary: '#8A8D00',      // PANTONE 392 C - Verde olivo
+  secondary: '#041E42',    // PANTONE 296 C - Azul marino
+  white: '#FFFFFF',
+  lightText: '#E5E7EB',
+  mutedText: '#9CA3AF',
+  accent: '#4F46E5',
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#EF4444',
+};
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const TourHistoryScreen = ({ navigation }) => {
   const { 
@@ -84,8 +102,10 @@ const TourHistoryScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+      
+      {/* ✅ HEADER CON COLOR INSTITUCIONAL */}
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => navigation.goBack()}
@@ -97,7 +117,7 @@ const TourHistoryScreen = ({ navigation }) => {
         <View style={styles.placeholder} />
       </View>
 
-      {/* Estadísticas */}
+      {/* ✅ ESTADÍSTICAS */}
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{stats.totalTours}</Text>
@@ -113,11 +133,15 @@ const TourHistoryScreen = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Lista de Tours */}
-      <ScrollView style={styles.content}>
+      {/* ✅ LISTA DE TOURS */}
+      <ScrollView 
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+      >
         {watchedTours.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>👀 No has visto ningún tour aún</Text>
+            <Text style={styles.emptyIcon}>👀</Text>
+            <Text style={styles.emptyText}>No has visto ningún tour aún</Text>
             <Text style={styles.emptySubtext}>
               Comienza a explorar para que aparezcan aquí
             </Text>
@@ -130,7 +154,9 @@ const TourHistoryScreen = ({ navigation }) => {
                   <Text style={styles.tourIndexText}>{index + 1}</Text>
                 </View>
                 <View style={styles.tourInfo}>
-                  <Text style={styles.tourTitle}>{tour.tourTitle}</Text>
+                  <Text style={styles.tourTitle} numberOfLines={2}>
+                    {tour.tourTitle}
+                  </Text>
                   <Text style={styles.tourType}>
                     {tour.tourType === '360' ? '🥽 Tour VR 360°' : '📱 Tour AR'}
                   </Text>
@@ -165,7 +191,7 @@ const TourHistoryScreen = ({ navigation }) => {
         )}
       </ScrollView>
 
-      {/* Botón Limpiar Todo */}
+      {/* ✅ BOTÓN LIMPIAR TODO */}
       {watchedTours.length > 0 && (
         <View style={styles.footer}>
           <TouchableOpacity
@@ -176,117 +202,153 @@ const TourHistoryScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: COLORS.secondary,
   },
+  
+  // ✅ HEADER CON COLOR INSTITUCIONAL
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 12 : 50,
+    paddingBottom: 16,
+    backgroundColor: COLORS.primary,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
   },
   backButton: {
-    padding: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
   },
   backButtonText: {
     fontSize: 16,
-    color: '#4F46E5',
+    color: COLORS.white,
     fontWeight: '600',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#111827',
+    color: COLORS.white,
+    flex: 1,
+    textAlign: 'center',
   },
   placeholder: {
-    width: 60,
+    width: 70,
   },
+  
+  // ✅ ESTADÍSTICAS
   statsContainer: {
     flexDirection: 'row',
-    padding: 20,
+    padding: 16,
     gap: 10,
+    backgroundColor: COLORS.secondary,
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 15,
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    padding: 16,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 2,
+    elevation: 3,
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '700',
-    color: '#4F46E5',
-    marginBottom: 5,
+    color: COLORS.primary,
+    marginBottom: 6,
   },
   statLabel: {
     fontSize: 12,
-    color: '#6B7280',
+    color: COLORS.mutedText,
     textAlign: 'center',
+    fontWeight: '500',
   },
+  
+  // ✅ CONTENT
   content: {
     flex: 1,
-    padding: 20,
   },
+  contentContainer: {
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  },
+  
+  // ✅ EMPTY STATE
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    paddingVertical: 80,
+    paddingHorizontal: 32,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 20,
   },
   emptyText: {
     fontSize: 18,
-    color: '#6B7280',
-    marginBottom: 8,
+    fontWeight: '600',
+    color: COLORS.lightText,
+    marginBottom: 10,
+    textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: COLORS.mutedText,
+    textAlign: 'center',
   },
+  
+  // ✅ TOUR CARDS
   tourCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 12,
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 2,
+    elevation: 3,
   },
   tourHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   tourIndex: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#EEF2FF',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(138, 141, 0, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 14,
+    borderWidth: 2,
+    borderColor: 'rgba(138, 141, 0, 0.3)',
   },
   tourIndexText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#4F46E5',
+    color: COLORS.primary,
   },
   tourInfo: {
     flex: 1,
@@ -294,66 +356,82 @@ const styles = StyleSheet.create({
   tourTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
+    color: COLORS.secondary,
+    marginBottom: 5,
+    lineHeight: 22,
   },
   tourType: {
     fontSize: 12,
-    color: '#6B7280',
+    color: COLORS.mutedText,
+    fontWeight: '500',
   },
   tourStats: {
     backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 14,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
   },
   tourStat: {
     fontSize: 14,
     color: '#6B7280',
-    marginBottom: 4,
+    marginBottom: 6,
+    lineHeight: 20,
   },
   tourStatBold: {
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: '700',
+    color: COLORS.secondary,
   },
   tourActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   actionButton: {
     flex: 1,
-    backgroundColor: '#EEF2FF',
-    borderRadius: 8,
-    padding: 10,
+    backgroundColor: 'rgba(138, 141, 0, 0.15)',
+    borderRadius: 10,
+    padding: 12,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(138, 141, 0, 0.3)',
   },
   actionButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#4F46E5',
+    color: COLORS.primary,
   },
   deleteButton: {
     backgroundColor: '#FEE2E2',
+    borderColor: '#FCA5A5',
   },
   deleteButtonText: {
-    color: '#DC2626',
+    color: COLORS.error,
   },
+  
+  // ✅ FOOTER
   footer: {
-    padding: 20,
-    backgroundColor: '#FFFFFF',
+    padding: 16,
+    backgroundColor: COLORS.secondary,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
   },
   clearAllButton: {
-    backgroundColor: '#DC2626',
+    backgroundColor: COLORS.error,
     borderRadius: 12,
-    padding: 15,
+    padding: 16,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
   clearAllButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: COLORS.white,
   },
 });
 

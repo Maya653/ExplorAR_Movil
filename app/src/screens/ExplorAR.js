@@ -1,4 +1,4 @@
-// src/screens/ExplorAR.js - OPTIMIZADO
+// src/screens/ExplorAR.js - ACTUALIZADO CON COLORES INSTITUCIONALES CUORH
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -13,10 +13,26 @@ import {
   Linking,
   Platform,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import useAnalyticsStore from '../stores/analyticsStore';
 import apiClient from '../api/apiClient';
+
+// ✅ COLORES INSTITUCIONALES CUORH
+const COLORS = {
+  primary: '#8A8D00',      // PANTONE 392 C - Verde olivo
+  secondary: '#041E42',    // PANTONE 296 C - Azul marino
+  white: '#FFFFFF',
+  lightText: '#E5E7EB',
+  mutedText: '#9CA3AF',
+  accent: '#4F46E5',
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#EF4444',
+};
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ✅ CACHE EN MEMORIA (persiste durante la sesión)
 let testimoniosCache = null;
@@ -118,10 +134,10 @@ const ExplorAR = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       
-      {/* Header con botón de refresh */}
+      {/* ✅ HEADER CON COLOR INSTITUCIONAL */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Image source={require('../../assets/flecha_retorno.png')} style={styles.backIcon} />
@@ -135,7 +151,7 @@ const ExplorAR = ({ navigation }) => {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4F46E5" />
+          <ActivityIndicator size="large" color={COLORS.white} />
           <Text style={styles.loadingText}>Cargando testimonios...</Text>
         </View>
       ) : testimonios.length === 0 ? (
@@ -182,7 +198,7 @@ const ExplorAR = ({ navigation }) => {
         </ScrollView>
       )}
 
-      {/* Modal sin cambios */}
+      {/* Modal sin cambios en lógica */}
       <Modal visible={!!selected} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -291,177 +307,346 @@ const ExplorAR = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3F4F6' },
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.secondary,
+  },
+  
+  // ✅ HEADER CON COLOR INSTITUCIONAL
   header: { 
-    padding: 16, 
-    backgroundColor: '#fff', 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#eee', 
+    backgroundColor: COLORS.primary,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 12 : 50,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
   },
   headerTitle: { 
-    fontSize: 20, 
+    fontSize: 22, 
     fontWeight: '700', 
-    color: '#111827', 
+    color: COLORS.white,
     flex: 1,
-    textAlign: 'center' 
+    textAlign: 'center',
   },
   backButton: { 
-    width: 36, 
-    height: 36, 
-    borderRadius: 18, 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center', 
-    justifyContent: 'center' 
+    justifyContent: 'center',
   },
-  backIcon: { width: 18, height: 18, tintColor: '#111827' },
+  backIcon: { 
+    width: 20, 
+    height: 20, 
+    tintColor: COLORS.white,
+  },
   refreshButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   refreshIcon: {
-    fontSize: 20,
+    fontSize: 22,
   },
+  
+  // ✅ LOADING
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: COLORS.secondary,
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#6B7280',
+    marginTop: 16,
+    fontSize: 15,
+    color: COLORS.lightText,
+    fontWeight: '500',
   },
-  scroll: { padding: 16, paddingBottom: 40 },
+  
+  // ✅ CONTENT
+  scroll: { 
+    padding: 16, 
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  },
+  
+  // ✅ CARDS
   cardHorizontal: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 12,
-    padding: 12,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    marginBottom: 14,
+    padding: 14,
     alignItems: 'center',
-    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   cardThumb: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    marginRight: 12,
+    width: 85,
+    height: 85,
+    borderRadius: 14,
+    marginRight: 14,
   },
   cardInfo: {
     flex: 1,
   },
-  cardName: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 4 },
-  cardRole: { fontSize: 12, color: '#6B7280', marginBottom: 8 },
-  cardText: { fontSize: 13, color: '#374151' },
+  cardName: { 
+    fontSize: 16, 
+    fontWeight: '700', 
+    color: COLORS.secondary, 
+    marginBottom: 4,
+  },
+  cardRole: { 
+    fontSize: 12, 
+    color: COLORS.mutedText, 
+    marginBottom: 8,
+  },
+  cardText: { 
+    fontSize: 13, 
+    color: '#374151',
+    lineHeight: 18,
+  },
   indicatorsRow: { 
     flexDirection: 'row', 
-    marginTop: 8, 
-    flexWrap: 'wrap' 
+    marginTop: 10, 
+    flexWrap: 'wrap',
   },
   indicator: { 
     backgroundColor: '#EEF2FF', 
-    paddingHorizontal: 8, 
-    paddingVertical: 4, 
+    paddingHorizontal: 10, 
+    paddingVertical: 5, 
     borderRadius: 12, 
     marginRight: 8, 
-    marginBottom: 4 
+    marginBottom: 4,
   },
   indicatorText: { 
     fontSize: 10, 
-    color: '#4F46E5', 
-    fontWeight: '600' 
+    color: COLORS.accent, 
+    fontWeight: '600',
   },
-  videoContainer: { width: '100%', height: 220, borderRadius: 8, overflow: 'hidden', backgroundColor: '#000', marginBottom: 8 },
-  videoWebView: { flex: 1, backgroundColor: '#000' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
-  modalCard: { width: '92%', maxHeight: '90%', backgroundColor: '#fff', borderRadius: 12, overflow: 'hidden' },
-  modalImage: { width: '100%', height: 220 },
-  modalName: { fontSize: 18, fontWeight: '700', color: '#111827' },
-  modalRole: { fontSize: 13, color: '#6B7280', marginBottom: 8 },
-  modalText: { fontSize: 14, color: '#374151', lineHeight: 20 },
-  modalFooter: { padding: 12, borderTopWidth: 1, borderTopColor: '#eee', alignItems: 'flex-end' },
-  closeButton: { backgroundColor: '#4F46E5', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
-  closeText: { color: '#fff', fontWeight: '700' },
-  emptyBox: { flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center' },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 6 },
-  emptySubtitle: { fontSize: 13, color: '#6B7280', textAlign: 'center', marginBottom: 16 },
+  
+  // ✅ EMPTY STATE
+  emptyBox: { 
+    flex: 1, 
+    padding: 32, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    backgroundColor: COLORS.secondary,
+  },
+  emptyIcon: { 
+    fontSize: 64, 
+    marginBottom: 20,
+  },
+  emptyTitle: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: COLORS.white, 
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: { 
+    fontSize: 14, 
+    color: COLORS.lightText, 
+    textAlign: 'center', 
+    marginBottom: 24,
+  },
   retryButton: {
-    backgroundColor: '#4F46E5',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 12,
     marginTop: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   retryButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 14,
+    color: COLORS.white,
+    fontWeight: '700',
+    fontSize: 15,
   },
+  
+  // ✅ MODAL
+  videoContainer: { 
+    width: '100%', 
+    height: 220, 
+    borderRadius: 12, 
+    overflow: 'hidden', 
+    backgroundColor: '#000', 
+    marginBottom: 12,
+  },
+  videoWebView: { 
+    flex: 1, 
+    backgroundColor: '#000',
+  },
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.6)', 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalCard: { 
+    width: '100%',
+    maxWidth: 500,
+    maxHeight: '90%', 
+    backgroundColor: COLORS.white, 
+    borderRadius: 16, 
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalImage: { 
+    width: '100%', 
+    height: 240,
+  },
+  modalName: { 
+    fontSize: 20, 
+    fontWeight: '700', 
+    color: COLORS.secondary,
+    marginBottom: 4,
+  },
+  modalRole: { 
+    fontSize: 14, 
+    color: COLORS.mutedText, 
+    marginBottom: 12,
+  },
+  modalText: { 
+    fontSize: 15, 
+    color: '#374151', 
+    lineHeight: 22,
+  },
+  modalFooter: { 
+    padding: 16, 
+    borderTopWidth: 1, 
+    borderTopColor: '#E5E7EB', 
+    alignItems: 'flex-end',
+    backgroundColor: '#F9FAFB',
+  },
+  closeButton: { 
+    backgroundColor: COLORS.accent, 
+    paddingHorizontal: 24, 
+    paddingVertical: 12, 
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  closeText: { 
+    color: COLORS.white, 
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  
+  // ✅ TESTIMONIAL SECTIONS
   testimonioSection: {
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: 20,
+    marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
-    color: '#111827',
-    marginBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    paddingBottom: 4,
+    color: COLORS.secondary,
+    marginBottom: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: COLORS.primary,
+    paddingBottom: 6,
   },
-  transcriptText: { fontSize: 13, color: '#374151', lineHeight: 18, backgroundColor: '#F9FAFB', padding: 8, borderRadius: 8 },
+  transcriptText: { 
+    fontSize: 14, 
+    color: '#374151', 
+    lineHeight: 20, 
+    backgroundColor: '#F9FAFB', 
+    padding: 12, 
+    borderRadius: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.accent,
+  },
   additionalInfo: {
     backgroundColor: '#F9FAFB',
-    padding: 12,
-    borderRadius: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#4F46E5',
+    padding: 14,
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.accent,
   },
   infoItem: {
     fontSize: 14,
     color: '#374151',
-    marginBottom: 6,
+    marginBottom: 8,
     lineHeight: 20,
   },
   tagsContainer: {
-    marginTop: 8,
+    marginTop: 10,
   },
   tagsLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#374151',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   tag: {
-    backgroundColor: '#4F46E5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 12,
-    marginRight: 6,
-    marginBottom: 4,
+    marginRight: 8,
+    marginBottom: 6,
     display: 'inline-flex',
   },
   tagText: {
     fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: '500',
+    color: COLORS.white,
+    fontWeight: '600',
   },
-  openButton: { backgroundColor: '#4F46E5', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
-  openButtonText: { color: '#fff', fontWeight: '700' },
-  mediaUrl: { fontSize: 12, color: '#6B7280', marginTop: 6 },
+  openButton: { 
+    backgroundColor: COLORS.accent, 
+    paddingHorizontal: 18, 
+    paddingVertical: 12, 
+    borderRadius: 10, 
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  openButtonText: { 
+    color: COLORS.white, 
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  mediaUrl: { 
+    fontSize: 12, 
+    color: COLORS.mutedText, 
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
 });
 
 export default ExplorAR;
