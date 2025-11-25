@@ -22,26 +22,40 @@ const useCareerStore = create((set, get) => ({
       return;
     }
 
-    set({ loading: true, error: null });
+    // Solo poner loading en true si no es un refresh silencioso (polling)
+    // O si no tenemos datos. Si ya tenemos datos, mejor no mostrar spinner global si es posible evitarlo.
+    if (!forceRefresh || state.careers.length === 0) {
+        set({ loading: true, error: null });
+    }
     
     try {
-      console.log('📥 Cargando carreras desde el servidor...');
+      // console.log('📥 Cargando carreras desde el servidor...');
       
+      // ✅ Cache busting: Agregar timestamp para evitar caché del servidor/red
+      const url = forceRefresh 
+        ? `${ENDPOINTS.CARRERAS}?_t=${Date.now()}` 
+        : ENDPOINTS.CARRERAS;
+
       // ✅ NUEVO: Reintentos automáticos configurados en apiClient
-      const response = await apiClient.get(ENDPOINTS.CARRERAS, {
+      const response = await apiClient.get(url, {
         timeout: 90000, // 90 segundos (mejor para Railway)
         retries: 3,     // 3 reintentos automáticos
       });
       
       const data = Array.isArray(response.data) ? response.data : [];
       
-      console.log(`✅ ${data.length} carreras cargadas`);
-      set({ 
-        careers: data, 
-        loading: false,
-        error: null,
-        lastFetch: Date.now() // ✅ NUEVO: Guardar timestamp
-      });
+      // Comparación profunda simple para evitar actualizaciones de estado innecesarias
+      if (JSON.stringify(state.careers) !== JSON.stringify(data)) {
+          console.log(`✅ ${data.length} carreras cargadas`);
+          set({ 
+            careers: data, 
+            loading: false,
+            error: null,
+            lastFetch: Date.now() // ✅ NUEVO: Guardar timestamp
+          });
+      } else {
+          set({ loading: false, error: null, lastFetch: Date.now() });
+      }
       
     } catch (error) {
       console.error('Error al cargar carreras:', error);

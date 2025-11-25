@@ -59,6 +59,7 @@ const PulseIcon = ({ name, size, color, style }) => {
 // Importar stores
 import useCareerStore from '../stores/careerStore';
 import useTourStore from '../stores/tourStore';
+import useTestimonialStore from '../stores/testimonialStore'; // ✅ NUEVO
 import useAnalyticsStore from '../stores/analyticsStore';
 import useHiddenStore from '../stores/hiddenStore';
 import useTourHistoryStore from '../stores/tourHistoryStore';
@@ -94,19 +95,24 @@ const HomeScreen = ({ navigation }) => {
   const prevCareersRef = useRef([]);
   const prevToursRef = useRef([]);
   const prevTestimoniosRef = useRef([]);
-  const isFirstLoadRef = useRef(true);
+  
+  // ✅ Flags de inicialización individual para evitar notificaciones masivas al inicio
+  const careersInitializedRef = useRef(false);
+  const toursInitializedRef = useRef(false);
+  const testimoniosInitializedRef = useRef(false);
 
   // Zustand stores
   const { careers, loading: careersLoading, fetchCareers, searchCareers } = useCareerStore();
   const { tours, loading: toursLoading, fetchTours } = useTourStore();
+  const { testimonials: testimonios, loading: testimoniosLoading, fetchTestimonials } = useTestimonialStore(); // ✅ Usar store
   const { trackScreenView, trackCareerView } = useAnalyticsStore();
   const { getTourWatchInfo, isTourWatched, getRecentlyWatchedTours } = useTourHistoryStore();
   const { unreadCount, checkForUpdates } = useNotificationStore();
 
   const [filteredCareers, setFilteredCareers] = useState([]);
   const [filteredTours, setFilteredTours] = useState([]);
-  const [testimonios, setTestimonios] = useState([]);
-  const [testimoniosLoading, setTestimoniosLoading] = useState(false);
+  // const [testimonios, setTestimonios] = useState([]); // ❌ Eliminado
+  // const [testimoniosLoading, setTestimoniosLoading] = useState(true); // ❌ Eliminado
 
   // ✅ Sincronizar contador de tours por carrera
   const getCareersWithTourCount = useCallback(() => {
@@ -122,19 +128,53 @@ const HomeScreen = ({ navigation }) => {
     });
   }, [careers, tours]);
 
-  // ✅ useEffect para detectar cambios
+  // ✅ useEffect para detectar cambios e inicialización
   useEffect(() => {
-    if (careers.length > 0 || tours.length > 0 || testimonios.length > 0) {
-      if (isFirstLoadRef.current) {
-        console.log("📦 Primera carga: Inicializando referencias sin notificaciones");
-        prevCareersRef.current = careers;
-        prevToursRef.current = tours;
-        prevTestimoniosRef.current = testimonios;
-        isFirstLoadRef.current = false;
-        return;
-      }
+    let shouldCheck = false;
 
-      console.log("🔍 Verificando cambios (no es primera carga)");
+    // 1. Inicializar Carreras
+    if (!careersInitializedRef.current) {
+      if (!careersLoading) {
+        prevCareersRef.current = careers;
+        careersInitializedRef.current = true;
+        console.log("📦 Carreras inicializadas (sin notificar):", careers.length);
+      }
+    } else if (careers !== prevCareersRef.current) {
+      shouldCheck = true;
+    }
+
+    // 2. Inicializar Tours
+    if (!toursInitializedRef.current) {
+      if (!toursLoading) {
+        prevToursRef.current = tours;
+        toursInitializedRef.current = true;
+        console.log("📦 Tours inicializados (sin notificar):", tours.length);
+      }
+    } else if (tours !== prevToursRef.current) {
+      shouldCheck = true;
+    }
+
+    // 3. Inicializar Testimonios
+    if (!testimoniosInitializedRef.current) {
+      if (!testimoniosLoading) {
+        prevTestimoniosRef.current = testimonios;
+        testimoniosInitializedRef.current = true;
+        console.log("📦 Testimonios inicializados (sin notificar):", testimonios.length);
+      }
+    } else if (testimonios !== prevTestimoniosRef.current) {
+      // ⚠️ FIX: Si prev era 0 y ahora hay muchos, y acabamos de cargar, actualizar referencia sin notificar
+      if (prevTestimoniosRef.current.length === 0 && testimonios.length > 0 && !testimoniosLoading) {
+         // Verificar si esto parece una carga inicial tardía
+         console.log("⚠️ Detectada carga tardía de testimonios. Actualizando referencia sin notificar.");
+         prevTestimoniosRef.current = testimonios;
+      } else {
+         shouldCheck = true;
+      }
+    }
+
+    // ✅ Solo verificar actualizaciones si todo está inicializado y hubo cambios
+    if (shouldCheck && careersInitializedRef.current && toursInitializedRef.current && testimoniosInitializedRef.current) {
+      console.log("🔍 Detectando cambios en tiempo real...");
       checkForUpdates(
         careers,
         tours,
@@ -144,11 +184,12 @@ const HomeScreen = ({ navigation }) => {
         prevTestimoniosRef.current
       );
 
+      // Actualizar referencias para la próxima comparación
       prevCareersRef.current = careers;
       prevToursRef.current = tours;
       prevTestimoniosRef.current = testimonios;
     }
-  }, [careers, tours, testimonios, checkForUpdates]);
+  }, [careers, tours, testimonios, careersLoading, toursLoading, testimoniosLoading, checkForUpdates]);
 
   // Función centralizada para cargar todos los datos
   const loadAllData = useCallback(async () => {
@@ -158,23 +199,14 @@ const HomeScreen = ({ navigation }) => {
       await Promise.all([
         fetchCareers(),
         fetchTours(),
+        fetchTestimonials(), // ✅ Usar store
       ]);
-
-      try {
-        const response = await apiClient.get(ENDPOINTS.TESTIMONIOS, { timeout: 120000 });
-        const data = Array.isArray(response.data) ? response.data : [];
-        setTestimonios(data);
-        console.log(`✅ ${data.length} testimonios cargados`);
-      } catch (err) {
-        console.error('Error cargando testimonios:', err);
-        setTestimonios([]);
-      }
 
       console.log('✅ Todos los datos cargados');
     } catch (error) {
       console.error('❌ Error cargando datos:', error);
     }
-  }, [fetchCareers, fetchTours]);
+  }, [fetchCareers, fetchTours, fetchTestimonials]);
 
   // ✅ Función de refresh
   const onRefresh = useCallback(async () => {
@@ -187,27 +219,21 @@ const HomeScreen = ({ navigation }) => {
       const currentTestimonios = [...testimonios];
 
       await Promise.all([
-        fetchCareers(),
+        fetchCareers(true), // Force refresh
         fetchTours(),
+        fetchTestimonials(true), // Force refresh
       ]);
-
-      try {
-        const response = await apiClient.get(ENDPOINTS.TESTIMONIOS, { timeout: 120000 });
-        const data = Array.isArray(response.data) ? response.data : [];
-        setTestimonios(data);
-      } catch (err) {
-        console.error('Error recargando testimonios:', err);
-      }
 
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       const newCareers = useCareerStore.getState().careers;
       const newTours = useTourStore.getState().tours;
+      const newTestimonios = useTestimonialStore.getState().testimonials;
 
       checkForUpdates(
         newCareers,
         newTours,
-        testimonios,
+        newTestimonios,
         currentCareers,
         currentTours,
         currentTestimonios
@@ -215,7 +241,7 @@ const HomeScreen = ({ navigation }) => {
 
       prevCareersRef.current = newCareers;
       prevToursRef.current = newTours;
-      prevTestimoniosRef.current = testimonios;
+      prevTestimoniosRef.current = newTestimonios;
 
       console.log('✅ Refresh completado exitosamente');
     } catch (error) {
@@ -224,7 +250,7 @@ const HomeScreen = ({ navigation }) => {
     } finally {
       setRefreshing(false);
     }
-  }, [fetchCareers, fetchTours, careers, tours, testimonios, checkForUpdates]);
+  }, [fetchCareers, fetchTours, fetchTestimonials, careers, tours, testimonios, checkForUpdates]);
 
   // Cargar datos al montar
   useEffect(() => {
@@ -320,9 +346,32 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  const isLoading = careersLoading || toursLoading;
+  const isLoading = (careersLoading || toursLoading) && careers.length === 0 && tours.length === 0;
 
-  // Store de ocultos (sesión)
+  // ✅ Polling para actualizaciones en tiempo real (cada 3 segundos)
+  useEffect(() => {
+    let isPolling = false;
+
+    const interval = setInterval(async () => {
+      if (!refreshing && !isPolling) { // Evitar solapamiento y conflictos con refresh manual
+        isPolling = true;
+        
+        try {
+          // ⚡ Ejecutar en paralelo sin await para respuesta más rápida
+          // Los stores manejan sus propios estados de forma independiente
+          fetchCareers(true).catch(err => console.log('Error polling careers:', err));
+          fetchTours(true).catch(err => console.log('Error polling tours:', err));
+          fetchTestimonials(true).catch(err => console.log('Error polling testimonios:', err));
+        } catch (error) {
+          console.log('Polling error:', error);
+        } finally {
+          isPolling = false;
+        }
+      }
+    }, 2000); // ⚡ 2 segundos para notificaciones más rápidas (optimizado)
+
+    return () => clearInterval(interval);
+  }, [fetchCareers, fetchTours, fetchTestimonials, refreshing]);
   const hiddenTours = useHiddenStore((s) => s.hiddenTours);
   const hiddenTestimonials = useHiddenStore((s) => s.hiddenTestimonials);
   const hideTour = useHiddenStore((s) => s.hideTour);

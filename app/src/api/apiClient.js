@@ -39,9 +39,9 @@ console.log('══════════════════════�
 // CONFIGURACIÓN DE REINTENTOS
 // ============================================
 
-const DEFAULT_TIMEOUT = 90000; // 90 segundos (Railway puede tardar)
-const DEFAULT_RETRIES = 3;     // 3 reintentos por defecto
-const RETRY_DELAY = 2000;      // 2 segundos entre reintentos
+const DEFAULT_TIMEOUT = 15000; // 15 segundos (optimizado para polling rápido)
+const DEFAULT_RETRIES = 2;     // 2 reintentos (optimizado para velocidad)
+const RETRY_DELAY = 1000;      // 1 segundo entre reintentos (más rápido)
 
 // ============================================
 // UTILIDADES
@@ -62,6 +62,10 @@ const timeoutFetch = (resource, options = {}, timeout = DEFAULT_TIMEOUT) => {
 // Headers por defecto
 const defaultHeaders = {
   'Content-Type': 'application/json',
+  // ✅ Anti-caché headers para asegurar tiempo real
+  'Cache-Control': 'no-cache, no-store, must-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0',
 };
 
 const buildUrl = (path) => {

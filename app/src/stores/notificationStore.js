@@ -239,13 +239,6 @@ const useNotificationStore = create(
       ) => {
         const state = get();
 
-        // ✅ Si no hay datos previos, NO crear notificaciones (primera carga)
-        if (prevCareers.length === 0 && prevTours.length === 0 && prevTestimonios.length === 0) {
-          console.log('📦 Primera carga detectada - No se crearán notificaciones');
-          state.updateLastCheck();
-          return;
-        }
-
         console.log('🔍 Verificando actualizaciones:', {
           carreras: { actual: careers.length, previa: prevCareers.length },
           tours: { actual: tours.length, previos: prevTours.length },
@@ -253,6 +246,23 @@ const useNotificationStore = create(
         });
 
         let notificationCount = 0;
+
+        // ✅ Helper para verificar si es reciente (menos de 15 min - optimizado)
+        const isRecent = (item) => {
+          const dateStr = item.createdAt || item.created_at || item.updatedAt || item.updated_at;
+          if (!dateStr) return false; // Si no hay fecha, asumimos que es antiguo
+          
+          const date = new Date(dateStr);
+          const now = new Date();
+          
+          // Calcular diferencia en minutos
+          const diffMs = now - date;
+          const diffMinutes = diffMs / 1000 / 60;
+          
+          // Aceptar si es reciente (últimos 15 min) O si la fecha es futura (reloj desincronizado)
+          // pero no demasiado futura (ej: < 24 horas para evitar errores de fecha 2099)
+          return diffMinutes < 15 && diffMinutes > -1440; 
+        };
 
         // ============================================
         // 1. VERIFICAR NUEVAS CARRERAS
@@ -263,9 +273,11 @@ const useNotificationStore = create(
         );
 
         newCareers.forEach((career) => {
-          console.log('🎓 Nueva carrera detectada:', career.title);
-          state.notifyNewCareer(career);
-          notificationCount++;
+          if (isRecent(career)) {
+            console.log('🎓 Nueva carrera detectada:', career.title);
+            state.notifyNewCareer(career);
+            notificationCount++;
+          }
         });
 
         // ============================================
@@ -276,12 +288,14 @@ const useNotificationStore = create(
         );
 
         newTours.forEach((tour) => {
-          const career = careers.find(
-            (c) => (c.id || c._id) === (tour.careerId || tour.career)
-          );
-          console.log('🎬 Nuevo tour detectado:', tour.title);
-          state.notifyNewTour(tour, career?.title || 'Carrera');
-          notificationCount++;
+          if (isRecent(tour)) {
+            const career = careers.find(
+              (c) => (c.id || c._id) === (tour.careerId || tour.career)
+            );
+            console.log('🎬 Nuevo tour detectado:', tour.title);
+            state.notifyNewTour(tour, career?.title || 'Carrera');
+            notificationCount++;
+          }
         });
 
         // ============================================
@@ -293,9 +307,13 @@ const useNotificationStore = create(
         );
 
         newTestimonios.forEach((testimonio) => {
-          console.log('💬 Nuevo testimonio detectado:', testimonio.author || testimonio.autor);
-          state.notifyNewTestimonio(testimonio);
-          notificationCount++;
+          if (isRecent(testimonio)) {
+            console.log('💬 Nuevo testimonio detectado:', testimonio.author || testimonio.autor);
+            state.notifyNewTestimonio(testimonio);
+            notificationCount++;
+          } else {
+            console.log('⏳ Testimonio ignorado por antigüedad:', testimonio.author || testimonio.autor);
+          }
         });
 
         // ============================================
