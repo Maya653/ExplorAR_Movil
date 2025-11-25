@@ -2,13 +2,6 @@
 const express = require('express');
 const { MongoClient, ObjectId } = require('mongodb');
 const cors = require('cors');
-<<<<<<< HEAD
-<<<<<<< HEAD
-const compression = require('compression');
-=======
->>>>>>> origin/MA
-=======
->>>>>>> 40e7681f7b8049b078e1d7635be91abed2671709
 require('dotenv').config();
 
 // Helper
@@ -17,23 +10,8 @@ const formatRating = (rating) => parseFloat(rating || 0).toFixed(1);
 const app = express();
 const port = process.env.PORT || 8080;
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-// ✅ OPTIMIZACIÓN: Compresión GZIP
-app.use(compression());
-
-// ✅ CONFIGURACIÓN: CORS y Body Parser aumentado para Base64
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
-=======
 app.use(cors());
 app.use(express.json());
->>>>>>> origin/MA
-=======
-app.use(cors());
-app.use(express.json());
->>>>>>> 40e7681f7b8049b078e1d7635be91abed2671709
 
 const uri = process.env.MONGODB_URI;
 
@@ -144,13 +122,6 @@ async function startServer() {
       res.json({ ok: true, mode: 'fallback', timestamp: new Date().toISOString() });
     });
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    // Iniciar servidor en modo fallback y salir de startServer
-=======
->>>>>>> origin/MA
-=======
->>>>>>> 40e7681f7b8049b078e1d7635be91abed2671709
     app.listen(port, '0.0.0.0', () => {
       console.log(`🚀 Servidor (fallback) corriendo en http://0.0.0.0:${port}`);
       console.log(`📱 Para emulador Android: http://10.0.2.2:${port}`);
@@ -159,43 +130,6 @@ async function startServer() {
       console.log(`   - GET  /health`);
     });
     return;
-<<<<<<< HEAD
-<<<<<<< HEAD
-
-  }
-
-    // Endpoint con paginación y cache: /api/tours?page=1&limit=20
-    app.get('/api/tours', async (req, res) => {
-      const startTime = Date.now();
-      console.log('📥 GET /api/tours - INICIO');
-
-      // Parámetros de paginación
-      const page = Math.max(1, parseInt(req.query.page || '1', 10));
-      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || '50', 10)));
-
-      // Si es la petición por defecto (page=1 y limit=50), permitimos usar cache para velocidad.
-      const useCache = page === 1 && limit === 50;
-
-      try {
-        // ✅ VERIFICAR SI HAY CACHE VÁLIDO (solo para la vista por defecto)
-        const now = Date.now();
-        if (useCache && toursCache && toursCacheTime && (now - toursCacheTime < CACHE_DURATION)) {
-          const cacheAge = Math.floor((now - toursCacheTime) / 1000);
-          console.log(`✅ Usando cache de tours (${cacheAge}s de antigüedad)`);
-          return res.json({ data: toursCache, page: 1, limit: toursCache.length, total: toursCache.length });
-        }
-
-        console.log(`🔄 Consultando MongoDB (page=${page}, limit=${limit})...`);
-
-        // Contar total (rápido en colecciones pequeñas, para grandes colecciones considerar estimatedDocumentCount)
-        const total = await toursColl.countDocuments();
-
-        // Pipeline con proyección y paginación
-        const skip = (page - 1) * limit;
-        const pipeline = [
-=======
-=======
->>>>>>> 40e7681f7b8049b078e1d7635be91abed2671709
   }
 
   try {
@@ -265,10 +199,6 @@ async function startServer() {
         
         // ✅ CONSULTA A MONGODB (solo metadatos)
         const docs = await toursColl.aggregate([
-<<<<<<< HEAD
->>>>>>> origin/MA
-=======
->>>>>>> 40e7681f7b8049b078e1d7635be91abed2671709
           {
             $project: {
               _id: 1,
@@ -284,21 +214,6 @@ async function startServer() {
               type: 1
             }
           },
-<<<<<<< HEAD
-<<<<<<< HEAD
-          { $skip: skip },
-          { $limit: limit }
-        ];
-
-        const docs = await toursColl.aggregate(pipeline)
-          .maxTimeMS(180000)
-          .toArray();
-
-        console.log(`📦 ${docs.length} tours obtenidos de MongoDB`);
-
-=======
-=======
->>>>>>> 40e7681f7b8049b078e1d7635be91abed2671709
           { $limit: 50 }
         ])
         .maxTimeMS(180000) // 3 minutos timeout
@@ -307,10 +222,6 @@ async function startServer() {
         console.log(`📦 ${docs.length} tours obtenidos de MongoDB`);
         
         // ✅ MAPEAR DATOS
-<<<<<<< HEAD
->>>>>>> origin/MA
-=======
->>>>>>> 40e7681f7b8049b078e1d7635be91abed2671709
         const mapped = docs.map(t => ({
           id: t._id?.toString() || '',
           _id: t._id?.toString() || '',
@@ -321,42 +232,6 @@ async function startServer() {
           description: t.description || '',
           careerId: t.careerId?.toString() || t.career?.toString() || null,
           type: t.type || 'AR',
-<<<<<<< HEAD
-<<<<<<< HEAD
-          multimedia: []
-        }));
-
-        // Guardar cache solo para la página por defecto
-        if (useCache) {
-          toursCache = mapped;
-          toursCacheTime = Date.now();
-        }
-
-        const duration = Date.now() - startTime;
-        const cacheExpiry = Math.floor(CACHE_DURATION / 1000);
-        console.log(`✅ Respuesta /api/tours (page=${page}) - took ${duration}ms`);
-
-        res.json({ data: mapped, page, limit, total });
-
-      } catch (err) {
-        console.error('❌ Error en /api/tours:', err.message);
-        console.error('Stack:', err.stack);
-
-        if (toursCache) {
-          console.warn('⚠️ Error en MongoDB, usando cache antiguo de tours (fallback)');
-          return res.json({ data: toursCache, page: 1, limit: toursCache.length, total: toursCache.length });
-        }
-
-        res.status(500).json({
-          error: 'Error al obtener tours',
-          message: err.message
-        });
-      }
-    });
-    
-=======
-=======
->>>>>>> 40e7681f7b8049b078e1d7635be91abed2671709
           multimedia: [] // Se carga en /api/tours/:id
         }));
         
@@ -384,10 +259,6 @@ async function startServer() {
         });
       }
     });
-<<<<<<< HEAD
->>>>>>> origin/MA
-=======
->>>>>>> 40e7681f7b8049b078e1d7635be91abed2671709
 
     // ========== ENDPOINT: Tour individual ==========
     app.get('/api/tours/:id', async (req, res) => {
@@ -440,15 +311,7 @@ async function startServer() {
       }
     });
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    // ========== ENDPOINT: Testimonios CON CACHE Y OPTIMIZACIÓN ==========
-=======
     // ========== ENDPOINT: Testimonios CON CACHE ==========
->>>>>>> origin/MA
-=======
-    // ========== ENDPOINT: Testimonios CON CACHE ==========
->>>>>>> 40e7681f7b8049b078e1d7635be91abed2671709
     app.get('/api/testimonios', async (req, res) => {
       console.log('📥 GET /api/testimonios - INICIO');
       
@@ -462,30 +325,7 @@ async function startServer() {
         }
         
         console.log('🔄 Consultando MongoDB...');
-<<<<<<< HEAD
-<<<<<<< HEAD
-        
-        // ✅ OPTIMIZACIÓN: Proyección para traer solo campos necesarios
-        // Esto reduce la carga de memoria si hay documentos muy grandes con campos extra
-        const docs = await testimoniosColl.find({}, {
-          projection: {
-            _id: 1,
-            author: 1, autor: 1, name: 1, title: 1,
-            authorImage: 1, autorimagen: 1, imageUrl: 1,
-            role: 1, position: 1, authorRole: 1,
-            year: 1, date: 1, graduationYear: 1,
-            text: 1, testimonio: 1, content: 1,
-            transcript: 1, transcripcion: 1,
-            mediaUrl: 1, videoUrl: 1,
-            email: 1, phone: 1, company: 1, location: 1, tags: 1
-          }
-        })
-=======
         const docs = await testimoniosColl.find({})
->>>>>>> origin/MA
-=======
-        const docs = await testimoniosColl.find({})
->>>>>>> 40e7681f7b8049b078e1d7635be91abed2671709
           .maxTimeMS(60000)
           .toArray();
         
@@ -647,19 +487,9 @@ async function startServer() {
       });
     });
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-  
-=======
   } catch (err) {
     console.error('❌ Error configurando endpoints:', err);
   }
->>>>>>> origin/MA
-=======
-  } catch (err) {
-    console.error('❌ Error configurando endpoints:', err);
-  }
->>>>>>> 40e7681f7b8049b078e1d7635be91abed2671709
 
   // ========== INICIAR SERVIDOR ==========
   app.listen(port, '0.0.0.0', () => {

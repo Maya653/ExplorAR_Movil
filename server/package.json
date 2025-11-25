@@ -1,11 +1,4 @@
 {
-<<<<<<< HEAD
-<<<<<<< HEAD
-  "dependencies": {
-    "compression": "^1.8.1"
-=======
-=======
->>>>>>> 40e7681f7b8049b078e1d7635be91abed2671709
   "name": "server",
   "version": "1.0.0",
   "description": "",
@@ -23,9 +16,5 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "mongodb": "^6.20.0"
-<<<<<<< HEAD
->>>>>>> origin/MA
-=======
->>>>>>> 40e7681f7b8049b078e1d7635be91abed2671709
   }
 }
