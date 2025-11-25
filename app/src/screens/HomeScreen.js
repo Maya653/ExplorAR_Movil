@@ -15,19 +15,46 @@ import {
   Platform,
   RefreshControl,
   Dimensions,
+  Animated,
+  Easing,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
+import { Ionicons } from '@expo/vector-icons';
 import {
   SearchIcon,
-  HeartIcon,
   PlayIcon,
   ClockIcon,
-  HomeIcon,
-  ExploreIcon,
-  BookmarkIcon,
-  StarIcon,
 } from '../../components/Icons';
+import AnimatedBell from '../../components/AnimatedBell';
+
+// ✅ Componente de Icono Animado (Pulso)
+const PulseIcon = ({ name, size, color, style }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const pulse = Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 1.2,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+    ]);
+
+    Animated.loop(pulse).start();
+  }, []);
+
+  return (
+    <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, style]}>
+      <Ionicons name={name} size={size} color={color} />
+    </Animated.View>
+  );
+};
 
 // Importar stores
 import useCareerStore from '../stores/careerStore';
@@ -40,17 +67,20 @@ import apiClient from '../api/apiClient';
 import { ENDPOINTS } from '../utils/constants';
 import { getTimeAgo, getWatchIndicatorColor } from '../utils/timeUtils';
 
-// ✅ COLORES INSTITUCIONALES CUORH
+// ✅ COLORES INSTITUCIONALES PREMIUM
 const COLORS = {
-  primary: '#8A8D00',      // PANTONE 392 C - Verde olivo (header, search)
-  secondary: '#041E42',    // PANTONE 296 C - Azul marino (fondo contenido)
-  white: '#FFFFFF',
-  lightText: '#E5E7EB',
-  mutedText: '#9CA3AF',
-  accent: '#4F46E5',
+  primary: '#D4AF37',      // Gold
+  secondary: '#0A1A2F',    // Dark Blue
+  background: '#0A1A2F',   // Dark Blue Background
+  card: '#112240',         // Lighter Blue for cards
+  text: '#E6F1FF',         // Light Text
+  muted: '#8892B0',        // Muted Text
+  accent: '#D4AF37',       // Gold Accent
   success: '#10B981',
   warning: '#F59E0B',
   error: '#EF4444',
+  white: '#FFFFFF',
+  border: '#233554',
 };
 
 // ✅ Obtener dimensiones para responsividad
@@ -334,10 +364,7 @@ const HomeScreen = ({ navigation }) => {
                 style={styles.notificationButton}
                 onPress={() => navigation.navigate('Notifications')}
               >
-                <Image
-                  source={require('../../assets/notificaciones.png')}
-                  style={styles.notificationIcon}
-                />
+                <AnimatedBell color={COLORS.primary} size={24} badgeCount={unreadCount} />
                 {unreadCount > 0 && (
                   <View style={styles.notificationBadge}>
                     <Text style={styles.notificationBadgeText}>
@@ -441,7 +468,10 @@ const HomeScreen = ({ navigation }) => {
             {/* Nuevos Tours Section */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>🆕 Nuevos Tours</Text>
+                <View style={{flexDirection:'row', alignItems:'center'}}>
+                <PulseIcon name="sparkles" size={20} color={COLORS.primary} style={{marginRight: 8}} />
+                <Text style={styles.sectionTitle}>Nuevos Tours</Text>
+              </View>
                 <View style={styles.statusLegend}>
                   <View style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: COLORS.success }]} />
@@ -516,9 +546,11 @@ const HomeScreen = ({ navigation }) => {
                               styles.statusIndicator,
                               { backgroundColor: isAvailable ? COLORS.success : COLORS.error }
                             ]}>
-                              <Text style={styles.statusText}>
-                                {isAvailable ? '📁' : '🔒'}
-                              </Text>
+                              {isAvailable ? (
+                                <Ionicons name="folder-open" size={12} color={COLORS.white} />
+                              ) : (
+                                <Ionicons name="lock-closed" size={12} color={COLORS.white} />
+                              )}
                             </View>
                             
                             {isAvailable && (
@@ -535,7 +567,7 @@ const HomeScreen = ({ navigation }) => {
                                 styles.watchIndicator,
                                 { backgroundColor: getWatchIndicatorColor(watchInfo?.watchedAt) }
                               ]}>
-                                <Text style={styles.watchIndicatorText}>👁️</Text>
+                                <Ionicons name="eye" size={12} color={COLORS.white} />
                               </View>
                             )}
                           </View>
@@ -563,25 +595,34 @@ const HomeScreen = ({ navigation }) => {
                             </View>
                             
                             <View style={styles.tourStatusContainer}>
-                              <Text style={[
-                                styles.tourStatusText,
-                                { color: isAvailable ? COLORS.success : COLORS.error }
-                              ]}>
-                                {isAvailable ? '✅ Tour subido y disponible' : '❌ Tour no disponible'}
-                              </Text>
+                              <View style={{flexDirection:'row', alignItems:'center'}}>
+                                <Ionicons name={isAvailable ? "checkmark-circle" : "close-circle"} size={14} color={isAvailable ? COLORS.success : COLORS.error} style={{marginRight: 4}} />
+                                <Text style={[
+                                  styles.tourStatusText,
+                                  { color: isAvailable ? COLORS.success : COLORS.error }
+                                ]}>
+                                  {isAvailable ? 'Tour disponible' : 'Tour no disponible'}
+                                </Text>
+                              </View>
                             </View>
                             
                             {isReallyNew && tour.createdAt && (
-                              <Text style={styles.addedDateText}>
-                                ✨ Agregado {getTimeAgo(tour.createdAt)}
-                              </Text>
+                              <View style={{flexDirection:'row', alignItems:'center', marginBottom: 4}}>
+                                <Ionicons name="sparkles" size={12} color={COLORS.primary} style={{marginRight: 4}} />
+                                <Text style={styles.addedDateText}>
+                                  Agregado {getTimeAgo(tour.createdAt)}
+                                </Text>
+                              </View>
                             )}
                             
                             {watchInfo && isAvailable && (
-                              <Text style={styles.watchInfoText}>
-                                👀 Visto {getTimeAgo(watchInfo.watchedAt)}
-                                {watchInfo.watchCount > 1 && ` • ${watchInfo.watchCount} veces`}
-                              </Text>
+                              <View style={{flexDirection:'row', alignItems:'center', marginBottom: 6}}>
+                                <Ionicons name="eye" size={12} color={COLORS.success} style={{marginRight: 4}} />
+                                <Text style={styles.watchInfoText}>
+                                  Visto {getTimeAgo(watchInfo.watchedAt)}
+                                  {watchInfo.watchCount > 1 && ` • ${watchInfo.watchCount} veces`}
+                                </Text>
+                              </View>
                             )}
                             
                             <View style={styles.tourDetails}>
@@ -615,10 +656,13 @@ const HomeScreen = ({ navigation }) => {
               return recentTours.length > 0 ? (
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Tours Recientes</Text>
+                    <View style={{flexDirection:'row', alignItems:'center'}}>
+                      <PulseIcon name="time" size={20} color={COLORS.primary} style={{marginRight: 8}} />
+                      <Text style={styles.sectionTitle}>Tours Recientes</Text>
+                    </View>
                     <View style={styles.recentToursInfo}>
                       <Text style={styles.recentToursSubtitle}>
-                        👁️ {recentTours.length} tours vistos
+                        <Ionicons name="eye" size={12} color={COLORS.muted} /> {recentTours.length} tours vistos
                       </Text>
                       <TouchableOpacity onPress={() => navigation.navigate('TourHistory')}>
                         <Text style={styles.seeAllButton}>Ver historial</Text>
@@ -644,7 +688,10 @@ const HomeScreen = ({ navigation }) => {
                         >
                           {index === 0 && (
                             <View style={styles.positionBadge}>
-                              <Text style={styles.positionText}>🏆 RECIENTE</Text>
+                              <View style={{flexDirection:'row', alignItems:'center'}}>
+                                <Ionicons name="trophy" size={10} color={COLORS.secondary} style={{marginRight: 4}} />
+                                <Text style={styles.positionText}>RECIENTE</Text>
+                              </View>
                             </View>
                           )}
                           
@@ -656,31 +703,43 @@ const HomeScreen = ({ navigation }) => {
                               styles.recentWatchIndicator,
                               { backgroundColor: getWatchIndicatorColor(watchedTour.watchedAt) }
                             ]}>
-                              <Text style={styles.recentWatchIndicatorText}>👁️</Text>
+                              <Ionicons name="eye" size={12} color={COLORS.white} />
                             </View>
                           </View>
                           
                           <View style={styles.watchStatusContainer}>
-                            <Text style={[
-                              styles.watchStatusText,
-                              { color: isRecent ? COLORS.success : COLORS.warning }
-                            ]}>
-                              ✅ Has visto este tour
-                            </Text>
+                            <View style={{flexDirection:'row', alignItems:'center'}}>
+                              <Ionicons name="checkmark-circle" size={12} color={isRecent ? COLORS.success : COLORS.warning} style={{marginRight: 4}} />
+                              <Text style={[
+                                styles.watchStatusText,
+                                { color: isRecent ? COLORS.success : COLORS.warning }
+                              ]}>
+                                Has visto este tour
+                              </Text>
+                            </View>
                           </View>
                           
                           <View style={styles.recentTourMeta}>
-                            <Text style={styles.recentTourTime}>
-                              🕒 {getTimeAgo(watchedTour.watchedAt)}
-                            </Text>
+                            <View style={{flexDirection:'row', alignItems:'center', marginBottom: 4}}>
+                              <Ionicons name="time" size={12} color={COLORS.muted} style={{marginRight: 4}} />
+                              <Text style={styles.recentTourTime}>
+                                {getTimeAgo(watchedTour.watchedAt)}
+                              </Text>
+                            </View>
                             
                             <View style={styles.watchStats}>
-                              <Text style={styles.recentTourCount}>
-                                📊 {watchedTour.watchCount} {watchedTour.watchCount === 1 ? 'vez' : 'veces'}
-                              </Text>
+                              <View style={{flexDirection:'row', alignItems:'center'}}>
+                                <Ionicons name="stats-chart" size={12} color={COLORS.primary} style={{marginRight: 4}} />
+                                <Text style={styles.recentTourCount}>
+                                  {watchedTour.watchCount} {watchedTour.watchCount === 1 ? 'vez' : 'veces'}
+                                </Text>
+                              </View>
                               {isFrequent && (
                                 <View style={styles.frequentBadge}>
-                                  <Text style={styles.frequentText}>⭐ FAVORITO</Text>
+                                  <View style={{flexDirection:'row', alignItems:'center'}}>
+                                    <Ionicons name="star" size={10} color={COLORS.primary} style={{marginRight: 4}} />
+                                    <Text style={styles.frequentText}>FAVORITO</Text>
+                                  </View>
                                 </View>
                               )}
                             </View>
@@ -712,7 +771,8 @@ const HomeScreen = ({ navigation }) => {
                     <Text style={styles.sectionTitle}>Tours Recientes</Text>
                   </View>
                   <View style={styles.emptyRecentContainer}>
-                    <Text style={styles.emptyRecentText}>👀 Aún no has visto ningún tour</Text>
+                    <Ionicons name="eye-off-outline" size={40} color={COLORS.muted} style={{marginBottom: 10}} />
+                    <Text style={styles.emptyRecentText}>Aún no has visto ningún tour</Text>
                     <Text style={styles.emptyRecentSubtext}>¡Explora los tours disponibles para comenzar!</Text>
                   </View>
                 </View>
@@ -739,7 +799,11 @@ const HomeScreen = ({ navigation }) => {
                     renderRightActions={renderRightActions}
                     onSwipeableOpen={() => hideTestimonial(t)}
                   >
-                    <View style={styles.testimonialCard}>
+                    <TouchableOpacity 
+                      style={styles.testimonialCard}
+                      onPress={() => navigation.navigate('ExplorAR', { testimonial: t })}
+                      activeOpacity={0.7}
+                    >
                       <Image
                         source={t.authorImage ? (typeof t.authorImage === 'string' ? { uri: t.authorImage } : t.authorImage) : require('../../assets/homescreen.png')}
                         style={styles.testimonialThumb}
@@ -748,7 +812,7 @@ const HomeScreen = ({ navigation }) => {
                         <Text style={styles.testimonialName}>{t.author || t.autor || 'Anónimo'}</Text>
                         <Text style={styles.testimonialText} numberOfLines={2}>{t.text}</Text>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   </Swipeable>
                 ))
               )}
@@ -762,7 +826,7 @@ const HomeScreen = ({ navigation }) => {
         {/* ✅ BOTTOM NAVIGATION */}
         <View style={styles.bottomNav}>
           <TouchableOpacity style={styles.navItem}>
-            <HomeIcon size={24} active={true} color={COLORS.primary} />
+            <PulseIcon name="home" size={24} color={COLORS.primary} />
             <Text style={[styles.navText, styles.activeNavText]}>Home</Text>
           </TouchableOpacity>
           <TouchableOpacity 
@@ -772,8 +836,8 @@ const HomeScreen = ({ navigation }) => {
               navigation.navigate('ExplorAR');
             }}
           >
-            <ExploreIcon size={24} color="#6B7280" />
-            <Text style={styles.navText}>Explorar</Text>
+            <Ionicons name="chatbubbles-outline" size={24} color={COLORS.muted} />
+            <Text style={styles.navText}>Testimonios</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.navItem}
@@ -782,7 +846,7 @@ const HomeScreen = ({ navigation }) => {
               navigation.navigate('Guardados');
             }}
           >
-            <BookmarkIcon size={24} color="#6B7280" />
+            <Ionicons name="bookmark-outline" size={24} color={COLORS.muted} />
             <Text style={styles.navText}>Guardados</Text>
           </TouchableOpacity>
         </View>
@@ -794,89 +858,106 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.background,
   },
   
   // ✅ HEADER STYLES
   headerWrapper: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.secondary,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 10 : 50,
-    paddingBottom: 16,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+    zIndex: 100,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    paddingHorizontal: 20,
+    marginBottom: 16,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   logo: {
-    width: 36,
-    height: 36,
-    marginRight: 10,
+    width: 40,
+    height: 40,
+    marginRight: 12,
+    resizeMode: 'contain',
   },
   appName: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: COLORS.white,
+    fontSize: 24,
+    fontWeight: '800',
+    color: COLORS.primary,
+    letterSpacing: 0.5,
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   notificationButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.3)',
   },
   notificationIcon: {
-    width: 26,
-    height: 26,
-    tintColor: COLORS.white,
+    width: 24,
+    height: 24,
+    tintColor: COLORS.primary,
   },
   notificationBadge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
+    top: -5,
+    right: -5,
     backgroundColor: COLORS.error,
     borderRadius: 10,
-    minWidth: 18,
-    height: 18,
+    minWidth: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 4,
     borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.secondary,
   },
   notificationBadgeText: {
     color: COLORS.white,
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: 'bold',
   },
   
   // ✅ SEARCH BAR
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    marginHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
     paddingHorizontal: 16,
-    borderRadius: 12,
-    height: 46,
+    borderRadius: 16,
+    height: 50,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     color: COLORS.secondary,
-    marginLeft: 10,
+    marginLeft: 12,
   },
   
   // ✅ CONTENT
@@ -884,35 +965,38 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingTop: 20,
+    paddingTop: 24,
+    paddingBottom: 100,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 100,
+    backgroundColor: COLORS.background,
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: COLORS.lightText,
+    marginTop: 16,
+    fontSize: 16,
+    color: COLORS.primary,
+    fontWeight: '600',
   },
   
   // ✅ SECTIONS
   section: {
-    paddingHorizontal: 16,
-    marginBottom: 24,
+    marginBottom: 32,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 20,
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: COLORS.white,
+    letterSpacing: 0.5,
   },
   seeAllButton: {
     fontSize: 14,
@@ -922,29 +1006,30 @@ const styles = StyleSheet.create({
   
   // ✅ CARDS
   cardsContainer: {
-    marginHorizontal: -16,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
   },
   featuredCard: {
-    width: SCREEN_WIDTH * 0.75,
-    maxWidth: 300,
-    height: 170,
-    borderRadius: 16,
+    width: SCREEN_WIDTH * 0.8,
+    height: 200,
+    borderRadius: 20,
     overflow: 'hidden',
     marginRight: 16,
-    elevation: 4,
+    elevation: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.2)',
   },
   cardGradient: {
     flex: 1,
-    padding: 16,
+    padding: 20,
   },
   cardContent: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
   },
   cardMetadata: {
     flexDirection: 'row',
@@ -952,215 +1037,237 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   categoryBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    backgroundColor: 'rgba(212, 175, 55, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
   },
   categoryText: {
-    color: COLORS.white,
+    color: COLORS.primary,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   highlightBadge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: '#FCD34D',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    top: 16,
+    right: 16,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
     zIndex: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   highlightText: {
-    color: '#92400E',
-    fontSize: 11,
-    fontWeight: '600',
+    color: COLORS.secondary,
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   cardTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     color: COLORS.white,
-    marginBottom: 4,
+    marginBottom: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   cardTours: {
-    fontSize: 13,
-    color: COLORS.lightText,
-    marginBottom: 4,
+    fontSize: 14,
+    color: COLORS.text,
+    marginBottom: 8,
+    opacity: 0.9,
   },
   cardDescription: {
-    fontSize: 12,
-    color: COLORS.lightText,
-    lineHeight: 18,
+    fontSize: 13,
+    color: COLORS.muted,
+    lineHeight: 20,
   },
   
   // ✅ EMPTY STATE
   emptyContainer: {
-    width: SCREEN_WIDTH * 0.75,
-    height: 150,
+    width: SCREEN_WIDTH - 40,
+    height: 160,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
+    backgroundColor: 'rgba(17, 34, 64, 0.5)',
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(212, 175, 55, 0.3)',
     borderStyle: 'dashed',
+    marginHorizontal: 20,
   },
   emptyText: {
-    color: COLORS.lightText,
-    fontSize: 14,
+    color: COLORS.muted,
+    fontSize: 16,
+    marginTop: 12,
   },
   
   // ✅ TOUR CARDS
   tourCard: {
     flexDirection: 'row',
-    backgroundColor: COLORS.white,
-    borderRadius: 14,
-    marginBottom: 12,
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    marginBottom: 16,
+    marginHorizontal: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 4,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   watchedTourCard: {
+    borderColor: COLORS.success,
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.success,
   },
   newTourCard: {
+    borderColor: COLORS.primary,
     borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
   },
   unavailableTourCard: {
-    opacity: 0.6,
+    opacity: 0.5,
+    backgroundColor: '#0f1a2a',
   },
   tourImageContainer: {
+    width: 100,
+    height: 100,
     position: 'relative',
   },
   tourImage: {
-    width: 85,
-    height: 85,
-    borderTopLeftRadius: 14,
-    borderBottomLeftRadius: 14,
+    width: '100%',
+    height: '100%',
   },
   unavailableImage: {
     opacity: 0.5,
   },
   statusIndicator: {
     position: 'absolute',
-    top: 6,
-    left: 6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    top: 8,
+    left: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  statusText: {
-    fontSize: 11,
+    backgroundColor: 'rgba(0,0,0,0.6)',
   },
   playButton: {
     position: 'absolute',
-    right: 6,
-    bottom: 6,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: COLORS.accent,
+    right: 8,
+    bottom: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   watchIndicator: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  watchIndicatorText: {
-    fontSize: 10,
+    borderWidth: 1,
+    borderColor: COLORS.white,
   },
   newBadge: {
     position: 'absolute',
-    top: 6,
-    left: 6,
-    backgroundColor: COLORS.success,
+    top: 8,
+    left: 8,
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
     zIndex: 2,
   },
   newBadgeText: {
-    color: COLORS.white,
-    fontSize: 9,
-    fontWeight: '700',
+    color: COLORS.secondary,
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   tourInfo: {
     flex: 1,
     padding: 12,
+    justifyContent: 'center',
   },
   tourHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   tourTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.secondary,
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.text,
     flex: 1,
   },
   unavailableTextDark: {
-    color: COLORS.mutedText,
+    color: COLORS.muted,
   },
   badgesContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   unavailableBadge: {
-    backgroundColor: COLORS.error,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 6,
-    marginLeft: 6,
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: COLORS.error,
   },
   unavailableBadgeText: {
-    color: COLORS.white,
-    fontSize: 8,
+    color: COLORS.error,
+    fontSize: 9,
     fontWeight: '700',
   },
   watchBadge: {
-    backgroundColor: COLORS.success,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 6,
-    marginLeft: 6,
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: COLORS.success,
   },
   watchBadgeText: {
-    color: COLORS.white,
-    fontSize: 8,
+    color: COLORS.success,
+    fontSize: 9,
     fontWeight: '700',
   },
   tourStatusContainer: {
     marginBottom: 6,
   },
   tourStatusText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '500',
   },
   addedDateText: {
-    fontSize: 10,
-    color: COLORS.success,
+    fontSize: 11,
+    color: COLORS.primary,
     fontWeight: '500',
     marginBottom: 4,
   },
   watchInfoText: {
-    fontSize: 10,
+    fontSize: 11,
     color: COLORS.success,
     marginBottom: 6,
     fontWeight: '500',
@@ -1169,6 +1276,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 4,
   },
   tourDuration: {
     flexDirection: 'row',
@@ -1176,18 +1284,18 @@ const styles = StyleSheet.create({
   },
   durationText: {
     fontSize: 12,
-    color: COLORS.mutedText,
-    marginLeft: 4,
+    color: COLORS.muted,
+    marginLeft: 6,
   },
   progressContainer: {
     width: 80,
     height: 4,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 2,
   },
   progressBar: {
     height: '100%',
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
     borderRadius: 2,
   },
   
@@ -1196,91 +1304,94 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   recentToursSubtitle: {
-    fontSize: 11,
-    color: COLORS.lightText,
-    marginBottom: 2,
+    fontSize: 12,
+    color: COLORS.muted,
+    marginBottom: 4,
   },
   recentTourCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 14,
-    padding: 14,
-    marginRight: 14,
-    width: SCREEN_WIDTH * 0.55,
-    maxWidth: 220,
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    padding: 16,
+    marginRight: 16,
+    width: 280, // Aumentado de 240
+    minHeight: 160, // Altura mínima para evitar aplastamiento
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-    position: 'relative',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+    justifyContent: 'space-between', // Distribuir contenido
   },
   veryRecentCard: {
     borderColor: COLORS.success,
-    borderWidth: 2,
+    borderWidth: 1,
+    backgroundColor: 'rgba(16, 185, 129, 0.05)',
   },
   mostRecentCard: {
-    backgroundColor: '#F0FDF4',
+    borderColor: COLORS.primary,
+    borderWidth: 1,
   },
   positionBadge: {
     position: 'absolute',
-    top: -8,
-    right: 8,
-    backgroundColor: COLORS.success,
-    paddingHorizontal: 8,
+    top: -10,
+    right: 12,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 10,
+    borderRadius: 12,
     zIndex: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   positionText: {
-    color: COLORS.white,
-    fontSize: 8,
-    fontWeight: '700',
+    color: COLORS.secondary,
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   recentTourHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   recentTourTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.secondary,
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.text,
     flex: 1,
-    marginRight: 8,
+    marginRight: 10,
   },
   recentWatchIndicator: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  recentWatchIndicatorText: {
-    fontSize: 11,
-  },
   watchStatusContainer: {
-    marginBottom: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    backgroundColor: '#F0FDF4',
-    borderRadius: 6,
+    marginBottom: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 8,
     borderLeftWidth: 3,
     borderLeftColor: COLORS.success,
   },
   watchStatusText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
   },
   recentTourMeta: {
-    marginBottom: 6,
+    marginBottom: 8,
   },
   recentTourTime: {
-    fontSize: 11,
-    color: '#6B7280',
-    marginBottom: 4,
+    fontSize: 12,
+    color: COLORS.muted,
+    marginBottom: 6,
     fontWeight: '500',
   },
   watchStats: {
@@ -1289,55 +1400,59 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   recentTourCount: {
-    fontSize: 11,
-    color: COLORS.accent,
+    fontSize: 12,
+    color: COLORS.primary,
     fontWeight: '600',
   },
   frequentBadge: {
-    backgroundColor: '#FCD34D',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    backgroundColor: 'rgba(212, 175, 55, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
   },
   frequentText: {
-    color: '#92400E',
-    fontSize: 8,
+    color: COLORS.primary,
+    fontSize: 9,
     fontWeight: '700',
   },
   timeIndicatorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 4,
   },
   timeIndicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
   },
   timeIndicatorText: {
-    fontSize: 9,
-    color: '#9CA3AF',
+    fontSize: 10,
+    color: COLORS.muted,
     fontStyle: 'italic',
   },
   emptyRecentContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 14,
-    padding: 24,
+    backgroundColor: 'rgba(17, 34, 64, 0.5)',
+    borderRadius: 16,
+    padding: 32,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     borderStyle: 'dashed',
+    marginHorizontal: 20,
   },
   emptyRecentText: {
-    fontSize: 15,
-    color: COLORS.lightText,
+    fontSize: 16,
+    color: COLORS.text,
     fontWeight: '600',
-    marginBottom: 6,
+    marginBottom: 8,
     textAlign: 'center',
   },
   emptyRecentSubtext: {
-    fontSize: 13,
-    color: COLORS.mutedText,
+    fontSize: 14,
+    color: COLORS.muted,
     textAlign: 'center',
   },
   
@@ -1345,54 +1460,65 @@ const styles = StyleSheet.create({
   testimonialCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    marginHorizontal: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   testimonialThumb: {
-    width: 54,
-    height: 54,
-    borderRadius: 12,
-    marginRight: 12,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 16,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
   },
   testimonialInfo: {
     flex: 1,
   },
   testimonialName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    color: COLORS.secondary,
+    color: COLORS.white,
     marginBottom: 4,
   },
   testimonialText: {
     fontSize: 13,
-    color: '#6B7280',
-    lineHeight: 18,
+    color: COLORS.muted,
+    lineHeight: 20,
+    fontStyle: 'italic',
   },
   
   // ✅ SWIPE ACTIONS
   swipeAction: {
     justifyContent: 'center',
     alignItems: 'center',
-    width: 90,
-    borderRadius: 14,
+    width: 80,
+    height: '100%',
+    borderRadius: 16,
+    marginVertical: 0,
+    marginBottom: 16,
   },
   swipeLeft: {
     backgroundColor: COLORS.warning,
+    marginLeft: 20,
   },
   swipeRight: {
     backgroundColor: COLORS.error,
+    marginRight: 20,
   },
   swipeText: {
     color: COLORS.white,
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 12,
   },
   
   // ✅ LEGEND
@@ -1403,17 +1529,17 @@ const styles = StyleSheet.create({
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 12,
+    marginLeft: 16,
   },
   legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 6,
   },
   legendText: {
-    fontSize: 10,
-    color: COLORS.lightText,
+    fontSize: 11,
+    color: COLORS.muted,
     fontWeight: '500',
   },
   
@@ -1422,29 +1548,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 16,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: COLORS.secondary,
+    paddingTop: 16,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 10,
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   navItem: {
     alignItems: 'center',
     paddingHorizontal: 20,
   },
   navText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 4,
+    fontSize: 11,
+    color: COLORS.muted,
+    marginTop: 6,
+    fontWeight: '500',
   },
   activeNavText: {
     color: COLORS.primary,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });
 

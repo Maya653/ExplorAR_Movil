@@ -19,19 +19,23 @@ import { LinearGradient } from 'expo-linear-gradient';
 import useCareerStore from '../stores/careerStore';
 import useTourStore from '../stores/tourStore';
 import useAnalyticsStore from '../stores/analyticsStore';
+import { Ionicons } from '@expo/vector-icons';
 import { SearchIcon } from '../../components/Icons';
 
-// ✅ COLORES INSTITUCIONALES CUORH
+// ✅ COLORES INSTITUCIONALES PREMIUM
 const COLORS = {
-  primary: '#8A8D00',      // PANTONE 392 C - Verde olivo
-  secondary: '#041E42',    // PANTONE 296 C - Azul marino
-  white: '#FFFFFF',
-  lightText: '#E5E7EB',
-  mutedText: '#9CA3AF',
-  accent: '#4F46E5',
+  primary: '#D4AF37',      // Gold
+  secondary: '#0A1A2F',    // Dark Blue
+  background: '#0A1A2F',   // Dark Blue Background
+  card: '#112240',         // Lighter Blue for cards
+  text: '#E6F1FF',         // Light Text
+  muted: '#8892B0',        // Muted Text
+  accent: '#D4AF37',       // Gold Accent
   success: '#10B981',
   warning: '#F59E0B',
   error: '#EF4444',
+  white: '#FFFFFF',
+  border: '#233554',
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -237,7 +241,7 @@ const AllCareersScreen = ({ navigation }) => {
         >
           {filteredCareers.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>🔍</Text>
+              <Ionicons name="search" size={60} color={COLORS.muted} style={{marginBottom: 20}} />
               <Text style={styles.emptyTitle}>
                 {searchText ? 'No se encontraron carreras' : 'No hay carreras disponibles'}
               </Text>
@@ -278,7 +282,7 @@ const AllCareersScreen = ({ navigation }) => {
                         </Text>
                         {career.isHighlighted && (
                           <View style={styles.highlightBadge}>
-                            <Text style={styles.highlightText}>⭐</Text>
+                            <Ionicons name="star" size={16} color={COLORS.primary} />
                           </View>
                         )}
                       </View>
@@ -293,7 +297,7 @@ const AllCareersScreen = ({ navigation }) => {
                         </View>
 
                         <View style={styles.tourCountContainer}>
-                          <Text style={styles.tourCountIcon}>🎬</Text>
+                          <Ionicons name="videocam" size={14} color={COLORS.success} style={{marginRight: 6}} />
                           <Text
                             style={[
                               styles.tourCountText,
@@ -306,7 +310,7 @@ const AllCareersScreen = ({ navigation }) => {
                       </View>
                     </View>
 
-                    <Text style={styles.chevron}>›</Text>
+                    <Ionicons name="chevron-forward" size={24} color={COLORS.muted} style={{alignSelf: 'center', marginRight: 16}} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -333,7 +337,7 @@ const AllCareersScreen = ({ navigation }) => {
                     </Text>
                     {career.isHighlighted && (
                       <View style={styles.highlightBadge}>
-                        <Text style={styles.highlightText}>⭐</Text>
+                        <Ionicons name="star" size={16} color={COLORS.primary} />
                       </View>
                     )}
                   </View>
@@ -348,7 +352,7 @@ const AllCareersScreen = ({ navigation }) => {
                     </View>
 
                     <View style={styles.tourCountContainer}>
-                      <Text style={styles.tourCountIcon}>🎬</Text>
+                      <Ionicons name="videocam" size={14} color={COLORS.success} style={{marginRight: 6}} />
                       <Text
                         style={[
                           styles.tourCountText,
@@ -361,7 +365,7 @@ const AllCareersScreen = ({ navigation }) => {
                   </View>
                 </View>
 
-                <Text style={styles.chevron}>›</Text>
+                <Ionicons name="chevron-forward" size={24} color={COLORS.muted} style={{alignSelf: 'center', marginRight: 16}} />
               </TouchableOpacity>
             ))
           )}
@@ -374,7 +378,7 @@ const AllCareersScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.background,
   },
   
   // ✅ HEADER CON COLOR INSTITUCIONAL
@@ -385,35 +389,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 12 : 50,
     paddingBottom: 16,
-    backgroundColor: COLORS.primary,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    backgroundColor: COLORS.secondary,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+    zIndex: 100,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.3)',
   },
   backIcon: {
     width: 20,
     height: 20,
-    tintColor: COLORS.white,
+    tintColor: COLORS.primary,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.white,
+    color: COLORS.primary,
     flex: 1,
     textAlign: 'center',
     marginHorizontal: 10,
+    letterSpacing: 0.5,
   },
   headerRight: {
     width: 40,
@@ -421,43 +429,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.3)',
   },
   careerCount: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
-    color: COLORS.white,
+    color: COLORS.primary,
   },
   
   // ✅ SEARCH BAR
   searchWrapper: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingHorizontal: 20,
+    paddingTop: 20,
     paddingBottom: 12,
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.background,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
-    borderRadius: 12,
-    height: 46,
+    borderRadius: 16,
+    height: 50,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     color: COLORS.secondary,
-    marginLeft: 10,
+    marginLeft: 12,
   },
   clearSearch: {
-    fontSize: 30,
-    color: COLORS.mutedText,
+    fontSize: 24,
+    color: COLORS.muted,
     fontWeight: '300',
     paddingHorizontal: 6,
   },
@@ -466,24 +478,24 @@ const styles = StyleSheet.create({
   sortContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    backgroundColor: COLORS.secondary,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    backgroundColor: COLORS.background,
   },
   sortLabel: {
-    fontSize: 13,
-    color: COLORS.lightText,
+    fontSize: 14,
+    color: COLORS.muted,
     fontWeight: '600',
     marginRight: 12,
   },
   sortButton: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginRight: 8,
+    borderRadius: 12,
+    backgroundColor: COLORS.card,
+    marginRight: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: COLORS.border,
   },
   sortButtonActive: {
     backgroundColor: COLORS.primary,
@@ -491,11 +503,12 @@ const styles = StyleSheet.create({
   },
   sortText: {
     fontSize: 13,
-    color: COLORS.mutedText,
+    color: COLORS.muted,
     fontWeight: '600',
   },
   sortTextActive: {
-    color: COLORS.white,
+    color: COLORS.secondary,
+    fontWeight: '700',
   },
   
   // ✅ CONTENT
@@ -510,11 +523,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: COLORS.background,
   },
   loadingText: {
     marginTop: 16,
-    fontSize: 15,
-    color: COLORS.lightText,
+    fontSize: 16,
+    color: COLORS.primary,
   },
   
   // ✅ EMPTY STATE
@@ -524,7 +538,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyIcon: {
-    fontSize: 72,
     marginBottom: 20,
   },
   emptyTitle: {
@@ -536,56 +549,59 @@ const styles = StyleSheet.create({
   },
   emptySubtitle: {
     fontSize: 14,
-    color: COLORS.lightText,
+    color: COLORS.muted,
     textAlign: 'center',
   },
   
   // ✅ CATEGORY SECTION
   categorySection: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   categoryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(138, 141, 0, 0.15)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(212, 175, 55, 0.1)',
     borderLeftWidth: 4,
     borderLeftColor: COLORS.primary,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   categoryTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: COLORS.primary,
+    letterSpacing: 0.5,
   },
   categoryCount: {
     fontSize: 12,
-    color: COLORS.lightText,
+    color: COLORS.muted,
     fontWeight: '600',
   },
   
   // ✅ CAREER CARDS
   careerCard: {
     flexDirection: 'row',
-    backgroundColor: COLORS.white,
-    marginHorizontal: 16,
-    marginBottom: 10,
-    borderRadius: 14,
+    backgroundColor: COLORS.card,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   careerAccent: {
-    width: 5,
+    width: 6,
   },
   careerContent: {
     flex: 1,
-    padding: 14,
+    padding: 16,
   },
   careerHeader: {
     flexDirection: 'row',
@@ -594,24 +610,24 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   careerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.secondary,
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.white,
     flex: 1,
     marginRight: 8,
-    lineHeight: 22,
+    lineHeight: 24,
   },
   highlightBadge: {
     padding: 4,
   },
   highlightText: {
-    fontSize: 18,
+    fontSize: 16,
   },
   careerDescription: {
     fontSize: 13,
-    color: '#6B7280',
-    lineHeight: 19,
-    marginBottom: 10,
+    color: COLORS.muted,
+    lineHeight: 20,
+    marginBottom: 12,
   },
   careerFooter: {
     flexDirection: 'row',
@@ -619,14 +635,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   categoryBadge: {
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   categoryBadgeText: {
     fontSize: 11,
-    color: COLORS.accent,
+    color: COLORS.text,
     fontWeight: '600',
   },
   tourCountContainer: {
@@ -634,15 +652,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   tourCountIcon: {
-    fontSize: 14,
-    marginRight: 5,
+    marginRight: 6,
   },
   tourCountText: {
-    fontSize: 12,
+    fontSize: 11,
     color: COLORS.success,
     fontWeight: '600',
   },
@@ -650,10 +669,8 @@ const styles = StyleSheet.create({
     color: COLORS.error,
   },
   chevron: {
-    fontSize: 28,
-    color: COLORS.mutedText,
     alignSelf: 'center',
-    marginRight: 14,
+    marginRight: 16,
   },
 });
 

@@ -14,6 +14,7 @@ import {
 	Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import {
 	PlayIcon,
 	StarIcon,
@@ -25,31 +26,29 @@ import {
 import useTourStore from '../stores/tourStore';
 import useAnalyticsStore from '../stores/analyticsStore';
 
-// ✅ COLORES INSTITUCIONALES CUORH
+// ✅ COLORES PREMIUM (Azul y Dorado)
 const COLORS = {
-	primary: '#8A8D00',      // PANTONE 392 C - Verde olivo
-	secondary: '#041E42',    // PANTONE 296 C - Azul marino
-	white: '#FFFFFF',
-	lightText: '#E5E7EB',
-	mutedText: '#9CA3AF',
-	accent: '#4F46E5',
-	success: '#10B981',
-	warning: '#F59E0B',
-	error: '#EF4444',
+  primary: '#D4AF37',      // Dorado Premium
+  secondary: '#0A1A2F',    // Azul Oscuro Profundo
+  background: '#0A1A2F',   // Fondo Principal
+  card: '#112240',         // Fondo de Tarjetas
+  text: '#E6F1FF',         // Texto Principal (Blanco Azulado)
+  subtext: '#8892B0',      // Texto Secundario (Gris Azulado)
+  accent: '#64FFDA',       // Acento (Cyan Brillante para detalles)
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#EF4444',
+  border: 'rgba(212, 175, 55, 0.2)', // Borde dorado sutil
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Colores elegantes para las cartas de tours
+// Colores elegantes para las cartas de tours (Gradientes oscuros/premium)
 const CARD_COLORS = [
-	['#667EEA', '#764BA2'], // Púrpura-azul
-	['#F093FB', '#F5576C'], // Rosa-coral
-	['#4FACFE', '#00F2FE'], // Azul-cian
-	['#43E97B', '#38F9D7'], // Verde-turquesa
-	['#FFECD2', '#FCB69F'], // Naranja-melocotón
-	['#A8EDEA', '#FED6E3'], // Menta-rosa
-	['#D299C2', '#FEF9D7'], // Lavanda-amarillo suave
-	['#89F7FE', '#66A6FF'], // Cian-azul
+	['#112240', '#0A1A2F'], // Azul profundo
+	['#1A365D', '#0F2A4A'], // Azul medio
+	['#233554', '#112240'], // Azul grisáceo
+	['#0F2A4A', '#1A365D'], // Azul inverso
 ];
 
 const CarreraScreen = ({ route, navigation }) => {
@@ -138,22 +137,19 @@ const CarreraScreen = ({ route, navigation }) => {
 
 	return (
 		<View style={styles.container}>
-			<StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+			<StatusBar barStyle="light-content" backgroundColor={COLORS.secondary} />
 
-			{/* ✅ HEADER CON GRADIENTE INSTITUCIONAL */}
+			{/* ✅ HEADER CON GRADIENTE PREMIUM */}
 			<LinearGradient 
-				colors={[COLORS.primary, COLORS.secondary]} 
+				colors={[COLORS.secondary, '#0F2A4A']} 
 				style={styles.header}
 			>
 				<View style={styles.headerTop}>
 					<TouchableOpacity style={styles.iconCircle} onPress={() => navigation.goBack()}>
-						<Image
-							source={require('../../assets/flecha_retorno.png')}
-							style={styles.smallIcon}
-						/>
+						<Ionicons name="arrow-back" size={24} color={COLORS.primary} />
 					</TouchableOpacity>
 					<TouchableOpacity style={styles.iconCircleRight}>
-						<HeartIcon size={20} color={COLORS.white} />
+						<HeartIcon size={20} color={COLORS.primary} />
 					</TouchableOpacity>
 				</View>
 
@@ -161,17 +157,13 @@ const CarreraScreen = ({ route, navigation }) => {
 					<Text style={styles.title}>{career?.title || 'Carrera'}</Text>
 					<View style={styles.statsRow}>
 						<View style={styles.statItem}>
-							<StarIcon />
-							<Text style={styles.statText}>{career?.rating || '0.0'}</Text>
+							<StarIcon size={16} color={COLORS.primary} />
+							<Text style={styles.statText}>{career?.rating || '4.8'}</Text>
 						</View>
 						<View style={styles.statItem}> 
-							<Image source={require('../../assets/icono_grupo.png')} style={styles.statIconImg} />
+							<Ionicons name="people-outline" size={16} color={COLORS.primary} />
 							{/* ✅ Mostrar contador real de tours */}
 							<Text style={styles.statText}>{careerTours.length} tours</Text>
-						</View>
-						<View style={styles.statItem}>
-							<ClockIcon />
-							<Text style={styles.statText}>5 años</Text>
 						</View>
 					</View>
 				</View>
@@ -183,9 +175,6 @@ const CarreraScreen = ({ route, navigation }) => {
 					<View style={styles.tabActive}>
 						<Text style={styles.tabActiveText}>Overview</Text>
 					</View>
-					<TouchableOpacity style={styles.tabInactive}>
-						<Text style={styles.tabInactiveText}>Tours AR</Text>
-					</TouchableOpacity>
 				</View>
 
 				<ScrollView 
@@ -194,13 +183,13 @@ const CarreraScreen = ({ route, navigation }) => {
 					showsVerticalScrollIndicator={false}
 				>
 					{loading ? (
-						<ActivityIndicator size="large" color={COLORS.white} style={{ marginTop: 24 }} />
+						<ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 24 }} />
 					) : (
 						<View style={styles.grid}>
 							{/* ✅ Mensaje cuando NO hay tours asignados */}
 							{careerTours.length === 0 ? (
 								<View style={styles.emptyState}>
-									<Text style={styles.emptyIcon}>🎓</Text>
+									<Ionicons name="school-outline" size={56} color={COLORS.subtext} style={{ marginBottom: 12 }} />
 									<Text style={styles.emptyText}>
 										Aún no hay tours para esta carrera
 									</Text>
@@ -220,7 +209,7 @@ const CarreraScreen = ({ route, navigation }) => {
 											key={t.id || t._id || idx} 
 											onPress={() => handleTourPress(t)}
 											activeOpacity={0.85}
-											style={{ marginBottom: 4 }}
+											style={{ marginBottom: 16 }}
 										>
 											<LinearGradient colors={colors} style={styles.card}>
 												{/* Header con badge */}
@@ -256,7 +245,7 @@ const CarreraScreen = ({ route, navigation }) => {
 														onPress={() => handleTourPress(t)}
 														activeOpacity={0.8}
 													>
-														<PlayIcon size={20} color={COLORS.white} />
+														<PlayIcon size={20} color={COLORS.primary} />
 													</TouchableOpacity>
 												</View>
 											</LinearGradient>
@@ -275,92 +264,87 @@ const CarreraScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
 	container: { 
 		flex: 1, 
-		backgroundColor: COLORS.secondary,
+		backgroundColor: COLORS.background,
 	},
 	
-	// ✅ HEADER CON COLORES INSTITUCIONALES
+	// ✅ HEADER CON COLORES PREMIUM
 	header: {
-		height: 260,
-		paddingHorizontal: 16,
-		paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 16 : 50,
-		borderBottomLeftRadius: 24,
-		borderBottomRightRadius: 24,
+		minHeight: 280,
+		paddingHorizontal: 20,
+		paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 20 : 60,
+		paddingBottom: 60,
+		borderBottomLeftRadius: 30,
+		borderBottomRightRadius: 30,
 		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.2,
-		shadowRadius: 8,
-		elevation: 8,
+		shadowOffset: { width: 0, height: 10 },
+		shadowOpacity: 0.4,
+		shadowRadius: 15,
+		elevation: 10,
 	},
 	headerTop: { 
 		flexDirection: 'row', 
 		justifyContent: 'space-between', 
 		alignItems: 'center',
-		marginBottom: 16,
+		marginBottom: 10,
 	},
 	iconCircle: {
 		width: 44,
 		height: 44,
 		borderRadius: 22,
-		backgroundColor: 'rgba(255,255,255,0.15)',
+		backgroundColor: 'rgba(255,255,255,0.1)',
 		alignItems: 'center',
 		justifyContent: 'center',
 		borderWidth: 1,
-		borderColor: 'rgba(255,255,255,0.2)',
+		borderColor: 'rgba(255,255,255,0.1)',
 	},
 	iconCircleRight: {
 		width: 44,
 		height: 44,
 		borderRadius: 22,
-		backgroundColor: 'rgba(255,255,255,0.15)',
+		backgroundColor: 'rgba(255,255,255,0.1)',
 		alignItems: 'center',
 		justifyContent: 'center',
 		borderWidth: 1,
-		borderColor: 'rgba(255,255,255,0.2)',
-	},
-	smallIcon: { 
-		width: 20, 
-		height: 20, 
-		tintColor: COLORS.white,
+		borderColor: 'rgba(255,255,255,0.1)',
 	},
 	headerBody: { 
-		marginTop: 8,
+		marginTop: 10,
 		flex: 1,
-		justifyContent: 'center',
+		justifyContent: 'flex-end',
+		paddingBottom: 10,
 	},
 	title: { 
-		color: COLORS.white, 
-		fontSize: 30, 
-		fontWeight: '700', 
+		color: COLORS.primary, 
+		fontSize: SCREEN_WIDTH < 380 ? 26 : 32,
+		fontWeight: '800', 
 		marginBottom: 16,
-		textShadowColor: 'rgba(0, 0, 0, 0.3)',
+		textShadowColor: 'rgba(0, 0, 0, 0.5)',
 		textShadowOffset: { width: 0, height: 2 },
 		textShadowRadius: 4,
+		letterSpacing: 0.5,
+		lineHeight: SCREEN_WIDTH < 380 ? 32 : 40,
 	},
 	statsRow: { 
 		flexDirection: 'row', 
 		alignItems: 'center',
 		flexWrap: 'wrap',
+		gap: 12,
 	},
 	statItem: { 
 		flexDirection: 'row', 
 		alignItems: 'center', 
-		marginRight: 20,
-		marginBottom: 8,
-		backgroundColor: 'rgba(255, 255, 255, 0.1)',
-		paddingHorizontal: 12,
-		paddingVertical: 6,
-		borderRadius: 12,
+		backgroundColor: 'rgba(10, 26, 47, 0.5)',
+		paddingHorizontal: 14,
+		paddingVertical: 8,
+		borderRadius: 14,
+		borderWidth: 1,
+		borderColor: 'rgba(212, 175, 55, 0.3)',
 	},
 	statText: { 
-		color: COLORS.white, 
+		color: COLORS.text, 
 		marginLeft: 8,
-		fontSize: 14,
+		fontSize: 13,
 		fontWeight: '600',
-	},
-	statIconImg: { 
-		width: 18, 
-		height: 18, 
-		tintColor: COLORS.white,
 	},
 
 	// ✅ CONTENIDO
@@ -371,14 +355,16 @@ const styles = StyleSheet.create({
 	},
 	tabsRow: { 
 		flexDirection: 'row', 
-		backgroundColor: COLORS.white, 
-		borderRadius: 12, 
+		backgroundColor: COLORS.card, 
+		borderRadius: 16, 
 		overflow: 'hidden', 
 		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.1,
+		shadowOffset: { width: 0, height: 4 },
+		shadowOpacity: 0.2,
 		shadowRadius: 8,
 		elevation: 4,
+		borderWidth: 1,
+		borderColor: 'rgba(255, 255, 255, 0.05)',
 	},
 	tabActive: { 
 		flex: 1, 
@@ -386,6 +372,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center', 
 		borderBottomColor: COLORS.primary,
 		borderBottomWidth: 3,
+		backgroundColor: 'rgba(212, 175, 55, 0.05)',
 	},
 	tabActiveText: { 
 		color: COLORS.primary, 
@@ -398,7 +385,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	tabInactiveText: { 
-		color: COLORS.mutedText, 
+		color: COLORS.subtext, 
 		fontWeight: '600',
 		fontSize: 15,
 	},
@@ -417,9 +404,11 @@ const styles = StyleSheet.create({
 		justifyContent: 'space-between',
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 8 },
-		shadowOpacity: 0.2,
+		shadowOpacity: 0.3,
 		shadowRadius: 12,
 		elevation: 8,
+		borderWidth: 1,
+		borderColor: 'rgba(255, 255, 255, 0.05)',
 	},
 	cardHeader: {
 		flexDirection: 'row',
@@ -428,44 +417,39 @@ const styles = StyleSheet.create({
 		marginBottom: 12,
 	},
 	cardBadge: {
-		backgroundColor: 'rgba(255,255,255,0.95)',
+		backgroundColor: 'rgba(10, 26, 47, 0.8)',
 		paddingHorizontal: 14,
-		paddingVertical: 7,
+		paddingVertical: 6,
 		borderRadius: 20,
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 2 },
-		shadowOpacity: 0.15,
-		shadowRadius: 4,
-		elevation: 4,
+		borderWidth: 1,
+		borderColor: COLORS.primary,
 	},
 	badgeText: { 
-		fontSize: 13, 
+		fontSize: 12, 
 		fontWeight: '700', 
-		color: COLORS.secondary,
+		color: COLORS.primary,
 		letterSpacing: 0.5,
+		textTransform: 'uppercase',
 	},
 	cardContent: {
 		flex: 1,
 		justifyContent: 'center',
 	},
 	cardTitle: { 
-		color: COLORS.white, 
+		color: COLORS.text, 
 		fontSize: 19, 
 		fontWeight: '700',
 		marginBottom: 8,
 		lineHeight: 26,
-		textShadowColor: 'rgba(0,0,0,0.4)',
-		textShadowOffset: { width: 0, height: 1 },
-		textShadowRadius: 3,
+		textShadowColor: 'rgba(0,0,0,0.5)',
+		textShadowOffset: { width: 0, height: 2 },
+		textShadowRadius: 4,
 	},
 	cardMeta: { 
-		color: 'rgba(255,255,255,0.95)', 
-		fontSize: 14,
+		color: COLORS.subtext, 
+		fontSize: 13,
 		fontWeight: '500',
 		lineHeight: 20,
-		textShadowColor: 'rgba(0,0,0,0.3)',
-		textShadowOffset: { width: 0, height: 1 },
-		textShadowRadius: 2,
 	},
 	cardFooter: {
 		flexDirection: 'row',
@@ -478,34 +462,35 @@ const styles = StyleSheet.create({
 		marginRight: 14,
 	},
 	progressText: {
-		color: 'rgba(255,255,255,0.85)',
-		fontSize: 12,
+		color: COLORS.subtext,
+		fontSize: 11,
 		marginBottom: 6,
-		fontWeight: '500',
+		fontWeight: '600',
+		textTransform: 'uppercase',
 	},
 	progressBar: {
-		height: 5,
-		backgroundColor: 'rgba(255,255,255,0.3)',
-		borderRadius: 3,
+		height: 4,
+		backgroundColor: 'rgba(255,255,255,0.1)',
+		borderRadius: 2,
 		overflow: 'hidden',
 	},
 	progressFill: {
 		height: '100%',
-		backgroundColor: COLORS.white,
-		borderRadius: 3,
+		backgroundColor: COLORS.primary,
+		borderRadius: 2,
 	},
 	playFloating: {
-		width: 52,
-		height: 52,
-		borderRadius: 26,
-		backgroundColor: 'rgba(255,255,255,0.2)',
+		width: 48,
+		height: 48,
+		borderRadius: 24,
+		backgroundColor: 'rgba(212, 175, 55, 0.1)',
 		alignItems: 'center',
 		justifyContent: 'center',
-		borderWidth: 2,
-		borderColor: 'rgba(255,255,255,0.4)',
-		shadowColor: '#000',
-		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.2,
+		borderWidth: 1,
+		borderColor: COLORS.primary,
+		shadowColor: COLORS.primary,
+		shadowOffset: { width: 0, height: 0 },
+		shadowOpacity: 0.4,
 		shadowRadius: 8,
 		elevation: 6,
 	},
@@ -515,26 +500,24 @@ const styles = StyleSheet.create({
 		width: '100%',
 		paddingVertical: 70,
 		alignItems: 'center',
-		backgroundColor: COLORS.white,
+		backgroundColor: COLORS.card,
 		borderRadius: 18,
 		marginTop: 20,
 		shadowColor: '#000',
 		shadowOffset: { width: 0, height: 4 },
-		shadowOpacity: 0.1,
+		shadowOpacity: 0.2,
 		shadowRadius: 12,
 		elevation: 4,
+		borderWidth: 1,
+		borderColor: 'rgba(255, 255, 255, 0.05)',
 	},
 	emptyText: {
 		fontSize: 16,
-		color: COLORS.mutedText,
+		color: COLORS.text,
 		textAlign: 'center',
-		fontWeight: '500',
+		fontWeight: '600',
 		marginTop: 12,
 		paddingHorizontal: 24,
-	},
-	emptyIcon: {
-		fontSize: 56,
-		marginBottom: 12,
 	},
 });
 

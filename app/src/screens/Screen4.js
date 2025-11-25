@@ -11,11 +11,21 @@ import {
   Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
-// ✅ COLORES INSTITUCIONALES CUORH
+// ✅ COLORES PREMIUM (Azul y Dorado)
 const COLORS = {
-  primary: '#8A8D00',      // PANTONE 392 C - Verde olivo
-  secondary: '#041E42',    // PANTONE 296 C - Azul marino
+  primary: '#D4AF37',      // Dorado Premium
+  secondary: '#0A1A2F',    // Azul Oscuro Profundo
+  background: '#0A1A2F',   // Fondo Principal
+  card: '#112240',         // Fondo de Tarjetas
+  text: '#E6F1FF',         // Texto Principal (Blanco Azulado)
+  subtext: '#8892B0',      // Texto Secundario (Gris Azulado)
+  accent: '#64FFDA',       // Acento (Cyan Brillante para detalles)
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#EF4444',
+  border: 'rgba(212, 175, 55, 0.2)', // Borde dorado sutil
 };
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -23,29 +33,30 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const Screen4 = ({ navigation }) => {
   return (
     <LinearGradient
-      colors={["#FAFBF9", "#F5F7F4", "#FFFFFF"]}
+      colors={[COLORS.background, COLORS.secondary, '#000000']}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
         
         {/* ✅ CÍRCULOS DECORATIVOS DE FONDO */}
         <View style={styles.decorativeCircle1} />
         <View style={styles.decorativeCircle2} />
         <View style={styles.decorativeCircle3} />
         
-        {/* ✅ CONFETTI DECORATION */}
-        <Text style={styles.confetti1}>🎉</Text>
-        <Text style={styles.confetti2}>✨</Text>
-        <Text style={styles.confetti3}>🎓</Text>
-        <Text style={styles.confetti4}>⭐</Text>
+        {/* ✅ ICONOS DECORATIVOS (Reemplazo de Emojis) */}
+        <Ionicons name="ribbon-outline" size={32} color={COLORS.primary} style={[styles.floatingIcon, styles.icon1]} />
+        <Ionicons name="sparkles-outline" size={28} color={COLORS.accent} style={[styles.floatingIcon, styles.icon2]} />
+        <Ionicons name="school-outline" size={30} color={COLORS.primary} style={[styles.floatingIcon, styles.icon3]} />
+        <Ionicons name="star-outline" size={26} color={COLORS.warning} style={[styles.floatingIcon, styles.icon4]} />
 
         <View style={styles.content}>
           {/* ✅ BADGE SUPERIOR */}
           <View style={styles.topBadge}>
-            <Text style={styles.badgeText}>✨ Paso 3 de 3</Text>
+            <Ionicons name="checkmark-circle" size={16} color={COLORS.primary} style={{ marginRight: 6 }} />
+            <Text style={styles.badgeText}>Paso 3 de 3</Text>
           </View>
 
           {/* ✅ IMAGEN CON BORDE INSTITUCIONAL */}
@@ -72,7 +83,7 @@ const Screen4 = ({ navigation }) => {
 
         {/* ✅ FOOTER CON GRADIENTE SUTIL */}
         <LinearGradient
-          colors={['transparent', 'rgba(255, 255, 255, 0.95)', '#FFFFFF']}
+          colors={['transparent', COLORS.secondary, COLORS.secondary]}
           style={styles.buttonContainer}
         >
           <View style={styles.indicatorsContainer}>
@@ -87,17 +98,18 @@ const Screen4 = ({ navigation }) => {
             onPress={() => navigation.navigate('Home')}
           >
             <LinearGradient
-              colors={[COLORS.primary, '#9FA600']}
+              colors={[COLORS.primary, '#F59E0B']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.buttonGradient}
             >
               <Text style={styles.startButtonText}>Empezar Exploración</Text>
+              <Ionicons name="arrow-forward" size={24} color="#FFFFFF" style={{ marginLeft: 8 }} />
             </LinearGradient>
           </TouchableOpacity>
 
           <Text style={styles.welcomeText}>
-            Bienvenido a <Text style={styles.boldText}>ExplorAR</Text> 🎓
+            Bienvenido a <Text style={styles.boldText}>ExplorAR</Text>
           </Text>
         </LinearGradient>
       </SafeAreaView>
@@ -122,7 +134,7 @@ const styles = StyleSheet.create({
     width: 280,
     height: 280,
     borderRadius: 140,
-    backgroundColor: 'rgba(138, 141, 0, 0.1)',
+    backgroundColor: 'rgba(212, 175, 55, 0.05)',
   },
   decorativeCircle2: {
     position: 'absolute',
@@ -131,7 +143,7 @@ const styles = StyleSheet.create({
     width: 240,
     height: 240,
     borderRadius: 120,
-    backgroundColor: 'rgba(4, 30, 66, 0.07)',
+    backgroundColor: 'rgba(100, 255, 218, 0.03)',
   },
   decorativeCircle3: {
     position: 'absolute',
@@ -140,38 +152,18 @@ const styles = StyleSheet.create({
     width: 160,
     height: 160,
     borderRadius: 80,
-    backgroundColor: 'rgba(138, 141, 0, 0.08)',
+    backgroundColor: 'rgba(212, 175, 55, 0.04)',
   },
   
-  // ✅ CONFETTI
-  confetti1: {
+  // ✅ ICONOS FLOTANTES
+  floatingIcon: {
     position: 'absolute',
-    top: 100,
-    left: 30,
-    fontSize: 32,
-    opacity: 0.4,
+    opacity: 0.6,
   },
-  confetti2: {
-    position: 'absolute',
-    top: 150,
-    right: 40,
-    fontSize: 28,
-    opacity: 0.4,
-  },
-  confetti3: {
-    position: 'absolute',
-    bottom: 300,
-    left: 50,
-    fontSize: 30,
-    opacity: 0.4,
-  },
-  confetti4: {
-    position: 'absolute',
-    bottom: 350,
-    right: 60,
-    fontSize: 26,
-    opacity: 0.4,
-  },
+  icon1: { top: 100, left: 30 },
+  icon2: { top: 150, right: 40 },
+  icon3: { bottom: 300, left: 50 },
+  icon4: { bottom: 350, right: 60 },
   
   content: {
     flex: 1,
@@ -184,13 +176,15 @@ const styles = StyleSheet.create({
   
   // ✅ BADGE SUPERIOR
   topBadge: {
-    backgroundColor: 'rgba(138, 141, 0, 0.12)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(212, 175, 55, 0.1)',
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 20,
     marginBottom: 32,
-    borderWidth: 1.5,
-    borderColor: 'rgba(138, 141, 0, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.3)',
   },
   badgeText: {
     fontSize: 14,
@@ -208,40 +202,19 @@ const styles = StyleSheet.create({
     height: 300,
     borderRadius: 30,
     padding: 5,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.card,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.5,
     shadowRadius: 16,
-    elevation: 8,
-    borderWidth: 3,
+    elevation: 10,
+    borderWidth: 2,
     borderColor: COLORS.primary,
   },
   graduatesImage: {
     width: '100%',
     height: '100%',
     borderRadius: 26,
-  },
-  floatingIcon: {
-    position: 'absolute',
-    top: -15,
-    right: -15,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-    borderWidth: 3,
-    borderColor: COLORS.primary,
-  },
-  floatingIconText: {
-    fontSize: 32,
   },
   
   // ✅ TÍTULO CON ACENTO
@@ -259,53 +232,17 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 36,
     fontWeight: '800',
-    color: COLORS.secondary,
+    color: COLORS.text,
     textAlign: 'center',
   },
   description: {
     fontSize: 16,
-    color: '#6B7280',
+    color: COLORS.subtext,
     textAlign: 'center',
     marginBottom: 32,
     paddingHorizontal: 12,
     lineHeight: 24,
     maxWidth: 340,
-  },
-  
-  // ✅ STATS
-  statsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(138, 141, 0, 0.15)',
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: '#E5E7EB',
-    marginHorizontal: 16,
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: COLORS.primary,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: '#6B7280',
-    fontWeight: '600',
-    textAlign: 'center',
   },
   
   // ✅ FOOTER
@@ -329,7 +266,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#D1D5DB',
+    backgroundColor: '#334155',
     marginHorizontal: 5,
   },
   activeIndicator: {
@@ -345,7 +282,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 8,
   },
@@ -362,7 +299,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   welcomeText: {
-    color: '#6B7280',
+    color: COLORS.subtext,
     fontSize: 14,
     fontWeight: '500',
   },

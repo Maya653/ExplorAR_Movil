@@ -1,4 +1,4 @@
-// components/Icons.js - VERSIÓN COMPLETA
+// components/Icons.js
 import React from 'react';
 import Svg, { Path, Circle } from 'react-native-svg';
 
@@ -113,4 +113,5 @@ export const BackIcon = ({ size = 24, color = '#111827' }) => (
       strokeLinejoin="round"
     />
   </Svg>
+
 );

@@ -16,20 +16,24 @@ import {
   Dimensions,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { Ionicons, Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import useAnalyticsStore from '../stores/analyticsStore';
 import apiClient from '../api/apiClient';
 
-// ✅ COLORES INSTITUCIONALES CUORH
+// ✅ COLORES PREMIUM (Azul y Dorado)
 const COLORS = {
-  primary: '#8A8D00',      // PANTONE 392 C - Verde olivo
-  secondary: '#041E42',    // PANTONE 296 C - Azul marino
-  white: '#FFFFFF',
-  lightText: '#E5E7EB',
-  mutedText: '#9CA3AF',
-  accent: '#4F46E5',
+  primary: '#D4AF37',      // Dorado Premium
+  secondary: '#0A1A2F',    // Azul Oscuro Profundo
+  background: '#0A1A2F',   // Fondo Principal
+  card: '#112240',         // Fondo de Tarjetas
+  text: '#E6F1FF',         // Texto Principal (Blanco Azulado)
+  subtext: '#8892B0',      // Texto Secundario (Gris Azulado)
+  accent: '#64FFDA',       // Acento (Cyan Brillante para detalles)
   success: '#10B981',
   warning: '#F59E0B',
   error: '#EF4444',
+  border: 'rgba(212, 175, 55, 0.2)', // Borde dorado sutil
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -43,16 +47,23 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 const getYouTubeIdFromUrl = (url) => {
   if (!url || typeof url !== 'string') return null;
   const patterns = [
-    /v=([\w-]+)/,
-    /youtu\.be\/([\w-]+)/,
-    /embed\/([\w-]+)/,
-    /youtube\.com\/v\/([\w-]+)/,
+    /[?&]v=([\w-]+)/,       // youtube.com/watch?v=ID
+    /youtu\.be\/([\w-]+)/,  // youtu.be/ID
+    /embed\/([\w-]+)/,      // youtube.com/embed/ID
+    /v\/([\w-]+)/,          // youtube.com/v/ID
+    /shorts\/([\w-]+)/,     // youtube.com/shorts/ID
   ];
   for (const p of patterns) {
     const m = url.match(p);
     if (m && m[1]) return m[1];
   }
   return null;
+};
+
+const isDirectVideo = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  const lower = url.toLowerCase();
+  return lower.includes('cloudinary') || lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.webm');
 };
 
 const openExternalUrl = async (url) => {
@@ -68,7 +79,7 @@ const openExternalUrl = async (url) => {
   }
 };
 
-const ExplorAR = ({ navigation }) => {
+const ExplorAR = ({ navigation, route }) => {
   const [testimonios, setTestimonios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -78,6 +89,16 @@ const ExplorAR = ({ navigation }) => {
     trackScreenView('Testimonials');
     fetchTestimonios();
   }, []);
+
+  // ✅ Detectar parámetro de navegación para abrir testimonio específico
+  useEffect(() => {
+    if (route.params?.testimonial) {
+      console.log('📌 Abriendo testimonio desde navegación:', route.params.testimonial.author);
+      setSelected(route.params.testimonial);
+      // Limpiar params para evitar que se reabra al volver
+      navigation.setParams({ testimonial: null });
+    }
+  }, [route.params?.testimonial]);
 
   const fetchTestimonios = async () => {
     // ✅ VERIFICAR CACHE PRIMERO
@@ -135,28 +156,31 @@ const ExplorAR = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.secondary} />
       
-      {/* ✅ HEADER CON COLOR INSTITUCIONAL */}
-      <View style={styles.header}>
+      {/* ✅ HEADER PREMIUM */}
+      <LinearGradient
+        colors={[COLORS.secondary, '#0F2A4A']}
+        style={styles.header}
+      >
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Image source={require('../../assets/flecha_retorno.png')} style={styles.backIcon} />
+          <Ionicons name="arrow-back" size={24} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Testimonios</Text>
         {/* ✅ BOTÓN DE REFRESH */}
         <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
-          <Text style={styles.refreshIcon}>🔄</Text>
+          <Ionicons name="refresh-outline" size={22} color={COLORS.primary} />
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.white} />
+          <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Cargando testimonios...</Text>
         </View>
       ) : testimonios.length === 0 ? (
         <View style={styles.emptyBox}>
-          <Text style={styles.emptyIcon}>📝</Text>
+          <Ionicons name="document-text-outline" size={64} color={COLORS.subtext} style={{ marginBottom: 20 }} />
           <Text style={styles.emptyTitle}>No hay testimonios disponibles</Text>
           <Text style={styles.emptySubtitle}>Intenta nuevamente más tarde</Text>
           <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
@@ -183,12 +207,14 @@ const ExplorAR = ({ navigation }) => {
                 <View style={styles.indicatorsRow}>
                   {((t._raw && (t._raw.transcript || t._raw.transcripcion)) || t.transcript) && (
                     <View style={styles.indicator}>
-                      <Text style={styles.indicatorText}>📝 Transcripción</Text>
+                      <Ionicons name="document-text-outline" size={12} color={COLORS.primary} style={{ marginRight: 4 }} />
+                      <Text style={styles.indicatorText}>Transcripción</Text>
                     </View>
                   )}
                   {((t._raw && (t._raw.mediaUrl || t._raw.videoUrl)) || t.mediaUrl) && (
                     <View style={styles.indicator}>
-                      <Text style={styles.indicatorText}>🎥 Video</Text>
+                      <Ionicons name="videocam-outline" size={12} color={COLORS.primary} style={{ marginRight: 4 }} />
+                      <Text style={styles.indicatorText}>Video</Text>
                     </View>
                   )}
                 </View>
@@ -232,6 +258,8 @@ const ExplorAR = ({ navigation }) => {
                   (() => {
                     const mediaUrl = (selected._raw && (selected._raw.mediaUrl || selected._raw.videoUrl)) || selected.mediaUrl;
                     const youtubeId = getYouTubeIdFromUrl(mediaUrl);
+                    const isVideo = isDirectVideo(mediaUrl);
+                    
                     return (
                       <View style={styles.testimonioSection}>
                         <Text style={styles.sectionTitle}>Video del Testimonio</Text>
@@ -240,7 +268,7 @@ const ExplorAR = ({ navigation }) => {
                             <div style={{ width: '100%', height: 220, borderRadius: 8, overflow: 'hidden', backgroundColor: '#000', marginBottom: 8 }}>
                               <iframe
                                 title={`youtube-${youtubeId}`}
-                                src={`https://www.youtube.com/embed/${youtubeId}?controls=1&modestbranding=1`}
+                                src={`https://www.youtube.com/embed/${youtubeId}?controls=1&modestbranding=1&rel=0`}
                                 style={{ width: '100%', height: '100%', border: 0 }}
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                 allowFullScreen
@@ -249,19 +277,59 @@ const ExplorAR = ({ navigation }) => {
                           ) : (
                             <View style={styles.videoContainer}>
                               <WebView
-                                source={{ uri: `https://www.youtube.com/embed/${youtubeId}?controls=1&modestbranding=1` }}
+                                source={{ uri: `https://www.youtube.com/embed/${youtubeId}?controls=1&modestbranding=1&rel=0` }}
                                 style={styles.videoWebView}
                                 allowsInlineMediaPlayback={true}
                                 mediaPlaybackRequiresUserAction={false}
+                                javaScriptEnabled={true}
+                                domStorageEnabled={true}
+                                startInLoadingState={true}
+                                renderLoading={() => <ActivityIndicator color={COLORS.primary} size="small" style={{position:'absolute', top: '45%', left: '45%'}} />}
                               />
                             </View>
                           )
+                        ) : isVideo ? (
+                          <View style={styles.videoContainer}>
+                            <WebView
+                              source={{ 
+                                html: `
+                                  <html>
+                                    <head>
+                                      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                                      <style>
+                                        body { margin: 0; padding: 0; background-color: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+                                        video { width: 100%; height: 100%; object-fit: contain; }
+                                      </style>
+                                    </head>
+                                    <body>
+                                      <video controls playsinline poster="${selected.authorImage || ''}">
+                                        <source src="${mediaUrl}" type="video/mp4">
+                                        Tu dispositivo no soporta la reproducción de este video.
+                                      </video>
+                                    </body>
+                                  </html>
+                                `
+                              }}
+                              style={styles.videoWebView}
+                              allowsInlineMediaPlayback={true}
+                              mediaPlaybackRequiresUserAction={false}
+                              javaScriptEnabled={true}
+                              domStorageEnabled={true}
+                              startInLoadingState={true}
+                              renderLoading={() => <ActivityIndicator color={COLORS.primary} size="small" style={{position:'absolute', top: '45%', left: '45%'}} />}
+                            />
+                          </View>
                         ) : (
-                          <TouchableOpacity style={styles.openButton} onPress={() => openExternalUrl(mediaUrl)}>
-                            <Text style={styles.openButtonText}>Ver video</Text>
-                          </TouchableOpacity>
+                          <View>
+                            <TouchableOpacity style={styles.openButton} onPress={() => openExternalUrl(mediaUrl)}>
+                              <Text style={styles.openButtonText}>Ver video externo</Text>
+                            </TouchableOpacity>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                              <Ionicons name="link-outline" size={14} color={COLORS.subtext} style={{ marginRight: 4 }} />
+                              <Text style={styles.mediaUrl}>{mediaUrl}</Text>
+                            </View>
+                          </View>
                         )}
-                        <Text style={styles.mediaUrl}>🔗 {mediaUrl}</Text>
                       </View>
                     );
                   })()
@@ -272,25 +340,42 @@ const ExplorAR = ({ navigation }) => {
                     <Text style={styles.sectionTitle}>Información Adicional</Text>
                     <View style={styles.additionalInfo}>
                       {selected._raw.email && (
-                        <Text style={styles.infoItem}>📧 {selected._raw.email}</Text>
+                        <View style={styles.infoRow}>
+                          <Ionicons name="mail-outline" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
+                          <Text style={styles.infoItem}>{selected._raw.email}</Text>
+                        </View>
                       )}
                       {selected._raw.phone && (
-                        <Text style={styles.infoItem}>📞 {selected._raw.phone}</Text>
+                        <View style={styles.infoRow}>
+                          <Ionicons name="call-outline" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
+                          <Text style={styles.infoItem}>{selected._raw.phone}</Text>
+                        </View>
                       )}
                       {selected._raw.company && (
-                        <Text style={styles.infoItem}>🏢 {selected._raw.company}</Text>
+                        <View style={styles.infoRow}>
+                          <Ionicons name="business-outline" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
+                          <Text style={styles.infoItem}>{selected._raw.company}</Text>
+                        </View>
                       )}
                       {selected._raw.location && (
-                        <Text style={styles.infoItem}>📍 {selected._raw.location}</Text>
+                        <View style={styles.infoRow}>
+                          <Ionicons name="location-outline" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
+                          <Text style={styles.infoItem}>{selected._raw.location}</Text>
+                        </View>
                       )}
                       {selected._raw.tags && Array.isArray(selected._raw.tags) && (
                         <View style={styles.tagsContainer}>
-                          <Text style={styles.tagsLabel}>🏷️ Tags:</Text>
-                          {selected._raw.tags.map((tag, index) => (
-                            <View key={index} style={styles.tag}>
-                              <Text style={styles.tagText}>{tag}</Text>
-                            </View>
-                          ))}
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                            <Ionicons name="pricetag-outline" size={16} color={COLORS.subtext} style={{ marginRight: 6 }} />
+                            <Text style={styles.tagsLabel}>Tags:</Text>
+                          </View>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                            {selected._raw.tags.map((tag, index) => (
+                              <View key={index} style={styles.tag}>
+                                <Text style={styles.tagText}>{tag}</Text>
+                              </View>
+                            ))}
+                          </View>
                         </View>
                       )}
                     </View>
@@ -314,12 +399,11 @@ const ExplorAR = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.background,
   },
   
-  // ✅ HEADER CON COLOR INSTITUCIONAL
+  // ✅ HEADER PREMIUM
   header: { 
-    backgroundColor: COLORS.primary,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 12 : 50,
     paddingBottom: 16,
     paddingHorizontal: 16,
@@ -329,30 +413,28 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   headerTitle: { 
     fontSize: 22, 
     fontWeight: '700', 
-    color: COLORS.white,
+    color: COLORS.primary,
     flex: 1,
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
   backButton: { 
     width: 40, 
     height: 40, 
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center', 
     justifyContent: 'center',
-  },
-  backIcon: { 
-    width: 20, 
-    height: 20, 
-    tintColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   refreshButton: {
     width: 40,
@@ -360,10 +442,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  refreshIcon: {
-    fontSize: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   
   // ✅ LOADING
@@ -371,12 +452,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.background,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 15,
-    color: COLORS.lightText,
+    color: COLORS.subtext,
     fontWeight: '500',
   },
   
@@ -389,22 +470,26 @@ const styles = StyleSheet.create({
   // ✅ CARDS
   cardHorizontal: {
     flexDirection: 'row',
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.card,
     borderRadius: 16,
-    marginBottom: 14,
-    padding: 14,
+    marginBottom: 16,
+    padding: 16,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   cardThumb: {
     width: 85,
     height: 85,
     borderRadius: 14,
-    marginRight: 14,
+    marginRight: 16,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
   },
   cardInfo: {
     flex: 1,
@@ -412,35 +497,40 @@ const styles = StyleSheet.create({
   cardName: { 
     fontSize: 16, 
     fontWeight: '700', 
-    color: COLORS.secondary, 
+    color: COLORS.text, 
     marginBottom: 4,
   },
   cardRole: { 
     fontSize: 12, 
-    color: COLORS.mutedText, 
+    color: COLORS.primary, 
     marginBottom: 8,
+    fontWeight: '600',
   },
   cardText: { 
     fontSize: 13, 
-    color: '#374151',
+    color: COLORS.subtext,
     lineHeight: 18,
   },
   indicatorsRow: { 
     flexDirection: 'row', 
-    marginTop: 10, 
+    marginTop: 12, 
     flexWrap: 'wrap',
   },
   indicator: { 
-    backgroundColor: '#EEF2FF', 
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(212, 175, 55, 0.1)', 
     paddingHorizontal: 10, 
-    paddingVertical: 5, 
+    paddingVertical: 6, 
     borderRadius: 12, 
     marginRight: 8, 
     marginBottom: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.2)',
   },
   indicatorText: { 
     fontSize: 10, 
-    color: COLORS.accent, 
+    color: COLORS.primary, 
     fontWeight: '600',
   },
   
@@ -450,22 +540,18 @@ const styles = StyleSheet.create({
     padding: 32, 
     alignItems: 'center', 
     justifyContent: 'center',
-    backgroundColor: COLORS.secondary,
-  },
-  emptyIcon: { 
-    fontSize: 64, 
-    marginBottom: 20,
+    backgroundColor: COLORS.background,
   },
   emptyTitle: { 
     fontSize: 18, 
     fontWeight: '700', 
-    color: COLORS.white, 
+    color: COLORS.text, 
     marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtitle: { 
     fontSize: 14, 
-    color: COLORS.lightText, 
+    color: COLORS.subtext, 
     textAlign: 'center', 
     marginBottom: 24,
   },
@@ -475,14 +561,14 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     marginTop: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   retryButtonText: {
-    color: COLORS.white,
+    color: COLORS.background,
     fontWeight: '700',
     fontSize: 15,
   },
@@ -495,6 +581,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden', 
     backgroundColor: '#000', 
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   videoWebView: { 
     flex: 1, 
@@ -502,7 +590,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: { 
     flex: 1, 
-    backgroundColor: 'rgba(0,0,0,0.6)', 
+    backgroundColor: 'rgba(10, 26, 47, 0.9)', 
     justifyContent: 'center', 
     alignItems: 'center',
     padding: 16,
@@ -511,141 +599,146 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 500,
     maxHeight: '90%', 
-    backgroundColor: COLORS.white, 
-    borderRadius: 16, 
+    backgroundColor: COLORS.card, 
+    borderRadius: 20, 
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   modalImage: { 
     width: '100%', 
     height: 240,
   },
   modalName: { 
-    fontSize: 20, 
+    fontSize: 22, 
     fontWeight: '700', 
-    color: COLORS.secondary,
+    color: COLORS.primary,
     marginBottom: 4,
   },
   modalRole: { 
     fontSize: 14, 
-    color: COLORS.mutedText, 
-    marginBottom: 12,
+    color: COLORS.subtext, 
+    marginBottom: 16,
+    fontWeight: '600',
   },
   modalText: { 
     fontSize: 15, 
-    color: '#374151', 
-    lineHeight: 22,
+    color: COLORS.text, 
+    lineHeight: 24,
   },
   modalFooter: { 
     padding: 16, 
     borderTopWidth: 1, 
-    borderTopColor: '#E5E7EB', 
+    borderTopColor: 'rgba(255, 255, 255, 0.05)', 
     alignItems: 'flex-end',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: COLORS.card,
   },
   closeButton: { 
-    backgroundColor: COLORS.accent, 
+    backgroundColor: 'rgba(255, 255, 255, 0.1)', 
     paddingHorizontal: 24, 
     paddingVertical: 12, 
     borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   closeText: { 
-    color: COLORS.white, 
-    fontWeight: '700',
+    color: COLORS.text, 
+    fontWeight: '600',
     fontSize: 15,
   },
   
   // ✅ TESTIMONIAL SECTIONS
   testimonioSection: {
-    marginTop: 20,
+    marginTop: 24,
     marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: COLORS.secondary,
-    marginBottom: 10,
+    color: COLORS.text,
+    marginBottom: 12,
     borderBottomWidth: 2,
     borderBottomColor: COLORS.primary,
     paddingBottom: 6,
+    alignSelf: 'flex-start',
   },
   transcriptText: { 
     fontSize: 14, 
-    color: '#374151', 
-    lineHeight: 20, 
-    backgroundColor: '#F9FAFB', 
-    padding: 12, 
-    borderRadius: 10,
+    color: COLORS.subtext, 
+    lineHeight: 22, 
+    backgroundColor: 'rgba(10, 26, 47, 0.5)', 
+    padding: 16, 
+    borderRadius: 12,
     borderLeftWidth: 3,
-    borderLeftColor: COLORS.accent,
+    borderLeftColor: COLORS.primary,
   },
   additionalInfo: {
-    backgroundColor: '#F9FAFB',
-    padding: 14,
-    borderRadius: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.accent,
+    backgroundColor: 'rgba(10, 26, 47, 0.5)',
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   infoItem: {
     fontSize: 14,
-    color: '#374151',
-    marginBottom: 8,
+    color: COLORS.subtext,
     lineHeight: 20,
   },
   tagsContainer: {
-    marginTop: 10,
+    marginTop: 12,
   },
   tagsLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
+    color: COLORS.text,
   },
   tag: {
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    backgroundColor: 'rgba(212, 175, 55, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 12,
     marginRight: 8,
-    marginBottom: 6,
-    display: 'inline-flex',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.3)',
   },
   tagText: {
     fontSize: 12,
-    color: COLORS.white,
+    color: COLORS.primary,
     fontWeight: '600',
   },
   openButton: { 
-    backgroundColor: COLORS.accent, 
+    backgroundColor: COLORS.primary, 
     paddingHorizontal: 18, 
     paddingVertical: 12, 
     borderRadius: 10, 
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
   },
   openButtonText: { 
-    color: COLORS.white, 
+    color: COLORS.background, 
     fontWeight: '700',
     fontSize: 14,
   },
   mediaUrl: { 
     fontSize: 12, 
-    color: COLORS.mutedText, 
-    marginTop: 8,
+    color: COLORS.accent, 
     fontStyle: 'italic',
+    textDecorationLine: 'underline',
   },
 });
 

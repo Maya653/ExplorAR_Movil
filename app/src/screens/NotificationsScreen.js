@@ -15,21 +15,24 @@ import {
   Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import useNotificationStore from '../stores/notificationStore';
 import useAnalyticsStore from '../stores/analyticsStore';
 import { getTimeAgo } from '../utils/timeUtils';
 
-// ✅ COLORES INSTITUCIONALES CUORH
+// ✅ COLORES PREMIUM (Azul y Dorado)
 const COLORS = {
-  primary: '#8A8D00',      // PANTONE 392 C - Verde olivo
-  secondary: '#041E42',    // PANTONE 296 C - Azul marino
-  white: '#FFFFFF',
-  lightText: '#E5E7EB',
-  mutedText: '#9CA3AF',
-  accent: '#4F46E5',
+  primary: '#D4AF37',      // Dorado Premium
+  secondary: '#0A1A2F',    // Azul Oscuro Profundo
+  background: '#0A1A2F',   // Fondo Principal
+  card: '#112240',         // Fondo de Tarjetas
+  text: '#E6F1FF',         // Texto Principal (Blanco Azulado)
+  subtext: '#8892B0',      // Texto Secundario (Gris Azulado)
+  accent: '#64FFDA',       // Acento (Cyan Brillante para detalles)
   success: '#10B981',
   warning: '#F59E0B',
   error: '#EF4444',
+  border: 'rgba(212, 175, 55, 0.2)', // Borde dorado sutil
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -165,48 +168,48 @@ const NotificationsScreen = ({ navigation }) => {
   const getNotificationIcon = (type) => {
     switch (type) {
       case 'new_career':
-        return '🎓';
+        return 'school-outline';
       case 'new_tour':
-        return '🎬';
+        return 'cube-outline';
       case 'new_testimonio':
-        return '💬';
+        return 'chatbubbles-outline';
       case 'career_updated':
-        return '🔄';
+        return 'refresh-circle-outline';
       case 'tour_updated':
-        return '🔄';
+        return 'refresh-circle-outline';
       case 'testimonio_updated':
-        return '🔄';
+        return 'refresh-circle-outline';
       case 'new_version':
-        return '🚀';
+        return 'rocket-outline';
       case 'featured_career':
-        return '⭐';
+        return 'star-outline';
       case 'system':
-        return '📢';
+        return 'megaphone-outline';
       default:
-        return '🔔';
+        return 'notifications-outline';
     }
   };
 
   const getNotificationColor = (type) => {
     switch (type) {
       case 'new_career':
-        return ['#4263EB', '#3B82F6'];
+        return [COLORS.primary, '#F59E0B']; // Dorado a Naranja
       case 'new_tour':
-        return ['#7C3AED', '#A78BFA'];
+        return ['#64FFDA', '#10B981']; // Cyan a Verde
       case 'new_testimonio':
-        return ['#10B981', '#34D399'];
+        return ['#A78BFA', '#7C3AED']; // Violeta
       case 'career_updated':
       case 'tour_updated':
       case 'testimonio_updated':
-        return ['#F59E0B', '#FBBF24'];
+        return ['#3B82F6', '#2563EB']; // Azul
       case 'new_version':
-        return ['#EF4444', '#F87171'];
+        return ['#EF4444', '#F87171']; // Rojo
       case 'featured_career':
-        return ['#EC4899', '#F472B6'];
+        return ['#EC4899', '#F472B6']; // Rosa
       case 'system':
-        return ['#6B7280', '#9CA3AF'];
+        return ['#6B7280', '#9CA3AF']; // Gris
       default:
-        return ['#4F46E5', '#7C3AED'];
+        return [COLORS.primary, COLORS.secondary];
     }
   };
 
@@ -215,15 +218,15 @@ const NotificationsScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.secondary} />
 
-      {/* ✅ HEADER CON COLOR INSTITUCIONAL */}
-      <View style={styles.header}>
+      {/* ✅ HEADER PREMIUM */}
+      <LinearGradient
+        colors={[COLORS.secondary, '#0F2A4A']}
+        style={styles.header}
+      >
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Image
-            source={require('../../assets/flecha_retorno.png')}
-            style={styles.backIcon}
-          />
+          <Ionicons name="arrow-back" size={24} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notificaciones</Text>
         {notifications.length > 0 && (
@@ -231,7 +234,7 @@ const NotificationsScreen = ({ navigation }) => {
             <Text style={styles.clearButtonText}>Limpiar</Text>
           </TouchableOpacity>
         )}
-      </View>
+      </LinearGradient>
 
       {/* ✅ FILTERS */}
       {notifications.length > 0 && (
@@ -271,14 +274,14 @@ const NotificationsScreen = ({ navigation }) => {
             refreshing={refreshing}
             onRefresh={onRefresh}
             colors={[COLORS.primary]}
-            tintColor={COLORS.white}
-            progressBackgroundColor={COLORS.secondary}
+            tintColor={COLORS.primary}
+            progressBackgroundColor={COLORS.card}
           />
         }
       >
         {filteredNotifications.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🔔</Text>
+            <Ionicons name="notifications-off-outline" size={80} color={COLORS.subtext} style={{ marginBottom: 20 }} />
             <Text style={styles.emptyTitle}>
               {filter === 'unread' ? 'No tienes notificaciones sin leer' : 'No hay notificaciones'}
             </Text>
@@ -302,7 +305,7 @@ const NotificationsScreen = ({ navigation }) => {
                 end={{ x: 1, y: 1 }}
                 style={styles.iconContainer}
               >
-                <Text style={styles.notificationIcon}>{getNotificationIcon(notification.type)}</Text>
+                <Ionicons name={getNotificationIcon(notification.type)} size={24} color={COLORS.white} />
               </LinearGradient>
 
               <View style={styles.notificationContent}>
@@ -323,12 +326,18 @@ const NotificationsScreen = ({ navigation }) => {
                 </Text>
 
                 <View style={styles.notificationFooter}>
-                  <Text style={styles.notificationTime}>
-                    🕒 {getTimeAgo(notification.timestamp)}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="time-outline" size={12} color={COLORS.subtext} style={{ marginRight: 4 }} />
+                    <Text style={styles.notificationTime}>
+                      {getTimeAgo(notification.timestamp)}
+                    </Text>
+                  </View>
 
                   {notification.read && (
-                    <Text style={styles.readIndicator}>✓ Leído</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="checkmark-done-outline" size={14} color={COLORS.success} style={{ marginRight: 2 }} />
+                      <Text style={styles.readIndicator}>Leído</Text>
+                    </View>
                   )}
                 </View>
               </View>
@@ -337,7 +346,7 @@ const NotificationsScreen = ({ navigation }) => {
                 style={styles.deleteButton}
                 onPress={() => handleDeleteNotification(notification.id)}
               >
-                <Text style={styles.deleteIcon}>×</Text>
+                <Ionicons name="close-outline" size={20} color={COLORS.error} />
               </TouchableOpacity>
             </TouchableOpacity>
           ))
@@ -358,58 +367,55 @@ const NotificationsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.background,
   },
   
-  // ✅ HEADER CON COLOR INSTITUCIONAL
+  // ✅ HEADER PREMIUM
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 12 : 50,
-    paddingBottom: 16,
-    backgroundColor: COLORS.primary,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 10 : 50,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backIcon: {
-    width: 20,
-    height: 20,
-    tintColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
-    color: COLORS.white,
+    color: COLORS.text,
     flex: 1,
     textAlign: 'center',
     marginHorizontal: 10,
+    letterSpacing: 0.5,
   },
   clearButton: {
     backgroundColor: 'rgba(239, 68, 68, 0.15)',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.3)',
   },
   clearButtonText: {
-    fontSize: 13,
-    color: '#FEE2E2',
+    fontSize: 12,
+    color: '#FCA5A5',
     fontWeight: '700',
   },
   
@@ -418,41 +424,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: COLORS.secondary,
+    backgroundColor: COLORS.background,
     gap: 10,
   },
   filterButton: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   filterButtonActive: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
   filterText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: COLORS.mutedText,
+    color: COLORS.subtext,
   },
   filterTextActive: {
-    color: COLORS.white,
+    color: COLORS.background,
+    fontWeight: '700',
   },
   markAllButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: 'rgba(138, 141, 0, 0.2)',
+    backgroundColor: 'rgba(212, 175, 55, 0.1)',
     marginLeft: 'auto',
     borderWidth: 1,
-    borderColor: 'rgba(138, 141, 0, 0.4)',
+    borderColor: COLORS.primary,
   },
   markAllText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     color: COLORS.primary,
   },
   
@@ -469,24 +476,21 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 100,
+    paddingVertical: 80,
     paddingHorizontal: 40,
-  },
-  emptyIcon: {
-    fontSize: 72,
-    marginBottom: 20,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.white,
+    fontWeight: '700',
+    color: COLORS.text,
     marginBottom: 10,
     textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: 14,
-    color: COLORS.lightText,
+    color: COLORS.subtext,
     textAlign: 'center',
+    lineHeight: 20,
   },
   
   // ✅ NOTIFICATION CARDS
@@ -494,35 +498,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 16,
     marginHorizontal: 16,
-    marginVertical: 6,
-    backgroundColor: COLORS.white,
-    borderRadius: 14,
+    marginVertical: 8,
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   unreadCard: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#1A2744', // Un poco más claro que card
     borderLeftWidth: 4,
     borderLeftColor: COLORS.primary,
+    borderColor: 'rgba(212, 175, 55, 0.3)',
   },
   iconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
-  },
-  notificationIcon: {
-    fontSize: 26,
   },
   notificationContent: {
     flex: 1,
@@ -530,56 +534,56 @@ const styles = StyleSheet.create({
   notificationHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   notificationTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: COLORS.secondary,
+    color: COLORS.text,
     flex: 1,
+    lineHeight: 20,
   },
   unreadTitle: {
     fontWeight: '700',
+    color: COLORS.white,
   },
   unreadDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: COLORS.primary,
     marginLeft: 8,
   },
   notificationMessage: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 10,
-    lineHeight: 20,
+    fontSize: 13,
+    color: COLORS.subtext,
+    marginBottom: 8,
+    lineHeight: 18,
   },
   notificationFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 4,
   },
   notificationTime: {
-    fontSize: 12,
-    color: COLORS.mutedText,
+    fontSize: 11,
+    color: COLORS.subtext,
+    fontWeight: '500',
   },
   readIndicator: {
-    fontSize: 12,
+    fontSize: 11,
     color: COLORS.success,
     fontWeight: '600',
   },
   deleteButton: {
-    width: 34,
-    height: 34,
+    width: 30,
+    height: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 17,
+    borderRadius: 15,
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
-  },
-  deleteIcon: {
-    fontSize: 26,
-    color: COLORS.error,
-    fontWeight: '300',
+    marginLeft: 8,
   },
   bottomInfo: {
     padding: 24,
@@ -587,9 +591,10 @@ const styles = StyleSheet.create({
   },
   bottomInfoText: {
     fontSize: 12,
-    color: COLORS.mutedText,
+    color: COLORS.subtext,
     textAlign: 'center',
     fontStyle: 'italic',
+    opacity: 0.7,
   },
 });
 

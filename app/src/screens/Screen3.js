@@ -12,11 +12,21 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 
-// ✅ COLORES INSTITUCIONALES CUORH
+// ✅ COLORES PREMIUM (Azul y Dorado)
 const COLORS = {
-  primary: '#8A8D00',      // PANTONE 392 C - Verde olivo
-  secondary: '#041E42',    // PANTONE 296 C - Azul marino
+  primary: '#D4AF37',      // Dorado Premium
+  secondary: '#0A1A2F',    // Azul Oscuro Profundo
+  background: '#0A1A2F',   // Fondo Principal
+  card: '#112240',         // Fondo de Tarjetas
+  text: '#E6F1FF',         // Texto Principal (Blanco Azulado)
+  subtext: '#8892B0',      // Texto Secundario (Gris Azulado)
+  accent: '#64FFDA',       // Acento (Cyan Brillante para detalles)
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#EF4444',
+  border: 'rgba(212, 175, 55, 0.2)', // Borde dorado sutil
 };
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -30,13 +40,13 @@ const Screen3 = () => {
 
   return (
     <LinearGradient
-      colors={["#F8FAFB", "#F3F5F7", "#FFFFFF"]}
+      colors={[COLORS.secondary, '#0F2A4A', '#112240']}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
       style={styles.gradient}
     >
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
         
         {/* ✅ CÍRCULOS DECORATIVOS DE FONDO */}
         <View style={styles.decorativeCircle1} />
@@ -46,7 +56,8 @@ const Screen3 = () => {
         <View style={styles.content}>
           {/* ✅ BADGE SUPERIOR */}
           <View style={styles.topBadge}>
-            <Text style={styles.badgeText}>🎯 Paso 2 de 3</Text>
+            <Ionicons name="rocket-outline" size={16} color={COLORS.primary} style={{ marginRight: 6 }} />
+            <Text style={styles.badgeText}>Paso 2 de 3</Text>
           </View>
 
           {/* ✅ IMAGEN CON BORDE INSTITUCIONAL */}
@@ -73,7 +84,7 @@ const Screen3 = () => {
 
         {/* ✅ FOOTER CON GRADIENTE SUTIL */}
         <LinearGradient
-          colors={['transparent', 'rgba(255, 255, 255, 0.95)', '#FFFFFF']}
+          colors={['transparent', COLORS.secondary, COLORS.secondary]}
           style={styles.buttonContainer}
         >
           <View style={styles.indicatorsContainer}>
@@ -88,12 +99,13 @@ const Screen3 = () => {
             onPress={handleNext}
           >
             <LinearGradient
-              colors={[COLORS.primary, '#9FA600']}
+              colors={[COLORS.primary, '#F59E0B']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.buttonGradient}
             >
               <Text style={styles.nextButtonText}>Siguiente</Text>
+              <Ionicons name="arrow-forward" size={20} color={COLORS.background} />
             </LinearGradient>
           </TouchableOpacity>
         </LinearGradient>
@@ -119,7 +131,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 110,
-    backgroundColor: 'rgba(138, 141, 0, 0.09)',
+    backgroundColor: 'rgba(212, 175, 55, 0.05)',
   },
   decorativeCircle2: {
     position: 'absolute',
@@ -128,7 +140,7 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 90,
-    backgroundColor: 'rgba(4, 30, 66, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
   },
   decorativeCircle3: {
     position: 'absolute',
@@ -137,7 +149,7 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: 'rgba(138, 141, 0, 0.07)',
+    backgroundColor: 'rgba(212, 175, 55, 0.08)',
   },
   
   content: {
@@ -145,19 +157,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 60 : 100,
-    paddingBottom: 200,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 40 : 80,
+    paddingBottom: 160,
   },
   
   // ✅ BADGE SUPERIOR
   topBadge: {
-    backgroundColor: 'rgba(138, 141, 0, 0.12)',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(212, 175, 55, 0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 20,
     marginBottom: 32,
-    borderWidth: 1.5,
-    borderColor: 'rgba(138, 141, 0, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.3)',
   },
   badgeText: {
     fontSize: 14,
@@ -171,44 +185,23 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   imageBorder: {
-    width: 290,
-    height: 290,
+    width: 280,
+    height: 280,
     borderRadius: 30,
-    padding: 5,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 8,
-    borderWidth: 3,
+    padding: 4,
+    backgroundColor: COLORS.card,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 10,
+    borderWidth: 2,
     borderColor: COLORS.primary,
   },
   lawImage: {
     width: '100%',
     height: '100%',
     borderRadius: 26,
-  },
-  floatingIcon: {
-    position: 'absolute',
-    bottom: -15,
-    left: -15,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-    borderWidth: 3,
-    borderColor: COLORS.primary,
-  },
-  floatingIconText: {
-    fontSize: 28,
   },
   
   // ✅ TÍTULO CON ACENTO
@@ -226,46 +219,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: '800',
-    color: COLORS.secondary,
+    color: COLORS.text,
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
   description: {
     fontSize: 16,
-    color: '#6B7280',
+    color: COLORS.subtext,
     textAlign: 'center',
     marginBottom: 32,
     paddingHorizontal: 12,
     lineHeight: 24,
     maxWidth: 340,
-  },
-  
-  // ✅ FEATURES
-  featuresContainer: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  featureItem: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(138, 141, 0, 0.15)',
-  },
-  featureIcon: {
-    fontSize: 24,
-    marginBottom: 6,
-  },
-  featureText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.secondary,
   },
   
   // ✅ FOOTER
@@ -275,7 +240,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     alignItems: 'center',
-    paddingTop: 24,
+    paddingTop: 40,
     paddingBottom: Platform.OS === 'ios' ? 40 : 24,
     paddingHorizontal: 24,
   },
@@ -283,13 +248,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   indicator: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#D1D5DB',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     marginHorizontal: 5,
   },
   activeIndicator: {
@@ -304,8 +269,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 6,
   },
@@ -317,19 +282,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   nextButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.background,
     fontSize: 18,
     fontWeight: '700',
-  },
-  arrow: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  skipText: {
-    color: '#9CA3AF',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });
 
