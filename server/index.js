@@ -211,7 +211,10 @@ async function startServer() {
               description: 1,
               careerId: 1,
               career: 1,
-              type: 1
+              type: 1,
+              youtubeUrl: 1,        // ✅ AGREGAR ESTA LÍNEA
+              youtubeVideoId: 1,    // ✅ AGREGAR ESTA LÍNEA (alternativa)
+              multimedia: 1         // ✅ AGREGAR ESTA LÍNEA (por si está ahí)
             }
           },
           { $limit: 50 }
@@ -222,18 +225,32 @@ async function startServer() {
         console.log(`📦 ${docs.length} tours obtenidos de MongoDB`);
         
         // ✅ MAPEAR DATOS
-        const mapped = docs.map(t => ({
-          id: t._id?.toString() || '',
-          _id: t._id?.toString() || '',
-          title: t.title || t.name || 'Sin título',
-          duration: t.duration || '0 min',
-          progress: t.progress || 0,
-          image: t.imageUrl || t.image || null,
-          description: t.description || '',
-          careerId: t.careerId?.toString() || t.career?.toString() || null,
-          type: t.type || 'AR',
-          multimedia: [] // Se carga en /api/tours/:id
-        }));
+        const mapped = docs.map(t => {
+          // Extraer youtubeUrl del objeto o del multimedia array
+          let youtubeUrl = t.youtubeUrl;
+          
+          // Si no está en el root, buscar en multimedia
+          if (!youtubeUrl && t.multimedia && t.multimedia.length > 0) {
+            const youtubeMedia = t.multimedia.find(m => m.youtubeUrl);
+            if (youtubeMedia) {
+              youtubeUrl = youtubeMedia.youtubeUrl;
+            }
+          }
+          
+          return {
+            id: t._id?.toString() || '',
+            _id: t._id?.toString() || '',
+            title: t.title || t.name || 'Sin título',
+            duration: t.duration || '0 min',
+            progress: t.progress || 0,
+            image: t.imageUrl || t.image || null,
+            description: t.description || '',
+            careerId: t.careerId?.toString() || t.career?.toString() || null,
+            type: t.type || 'AR',
+            youtubeUrl: youtubeUrl || null,  // ✅ INCLUIR ESTE CAMPO
+            multimedia: []
+          };
+        });
         
         // ✅ GUARDAR EN CACHE
         toursCache = mapped;
@@ -259,7 +276,6 @@ async function startServer() {
         });
       }
     });
-
     // ========== ENDPOINT: Tour individual ==========
     app.get('/api/tours/:id', async (req, res) => {
       try {
