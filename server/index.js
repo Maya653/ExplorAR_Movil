@@ -276,42 +276,55 @@ async function startServer() {
         });
       }
     });
-    // ========== ENDPOINT: Tour individual ==========
-    app.get('/api/tours/:id', async (req, res) => {
-      try {
-        const { id } = req.params;
-        console.log(`📥 GET /api/tours/${id}`);
-        
-        if (!ObjectId.isValid(id)) {
-          return res.status(400).json({ error: 'ID inválido' });
-        }
+// ========== ENDPOINT: Tour individual ==========
+app.get('/api/tours/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`📥 GET /api/tours/${id}`);
+    
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'ID inválido' });
+    }
 
-        const tour = await toursColl.findOne({ _id: new ObjectId(id) });
-        
-        if (!tour) {
-          return res.status(404).json({ error: 'Tour no encontrado' });
-        }
+    const tour = await toursColl.findOne({ _id: new ObjectId(id) });
+    
+    if (!tour) {
+      return res.status(404).json({ error: 'Tour no encontrado' });
+    }
 
-        const mapped = {
-          id: tour._id.toString(),
-          _id: tour._id.toString(),
-          title: tour.title || tour.name || 'Sin título',
-          description: tour.description || '',
-          duration: tour.duration || '0 min',
-          type: tour.type || 'AR',
-          careerId: tour.careerId || tour.career || null,
-          multimedia: tour.multimedia || [],
-          hotspots: tour.hotspots || [],
-          arConfig: tour.arConfig || {},
-        };
-
-        console.log(`✅ Tour encontrado: ${mapped.title}`);
-        return res.json(mapped);
-      } catch (err) {
-        console.error('❌ Error en GET /api/tours/:id:', err);
-        return res.status(500).json({ error: 'Error interno', details: err.message });
+    // ✅ Extraer youtubeUrl del root o del multimedia array
+    let youtubeUrl = tour.youtubeUrl;
+    
+    if (!youtubeUrl && tour.multimedia && tour.multimedia.length > 0) {
+      const youtubeMedia = tour.multimedia.find(m => m.youtubeUrl);
+      if (youtubeMedia) {
+        youtubeUrl = youtubeMedia.youtubeUrl;
       }
-    });
+    }
+
+    const mapped = {
+      id: tour._id.toString(),
+      _id: tour._id.toString(),
+      title: tour.title || tour.name || 'Sin título',
+      description: tour.description || '',
+      duration: tour.duration || '0 min',
+      type: tour.type || 'AR',
+      careerId: tour.careerId || tour.career || null,
+      youtubeUrl: youtubeUrl || null,  // ✅ AGREGAR ESTA LÍNEA
+      multimedia: tour.multimedia || [],
+      hotspots: tour.hotspots || [],
+      arConfig: tour.arConfig || {},
+    };
+
+    console.log(`✅ Tour encontrado: ${mapped.title}`);
+    console.log(`📹 YouTube URL: ${mapped.youtubeUrl}`);  // ✅ Log para debugging
+    return res.json(mapped);
+  } catch (err) {
+    console.error('❌ Error en GET /api/tours/:id:', err);
+    return res.status(500).json({ error: 'Error interno', details: err.message });
+  }
+});
+
 
     // ========== ENDPOINT: Modelo del tour ==========
     app.get('/api/tours/:id/model', async (req, res) => {
