@@ -311,6 +311,7 @@ app.get('/api/tours/:id', async (req, res) => {
       type: tour.type || 'AR',
       careerId: tour.careerId || tour.career || null,
       youtubeUrl: youtubeUrl || null,  // ✅ AGREGAR ESTA LÍNEA
+      kuulaUrl: tour.kuulaUrl || null,  // ✅ AGREGAR ESTA LÍNEA
       multimedia: tour.multimedia || [],
       hotspots: tour.hotspots || [],
       arConfig: tour.arConfig || {},
@@ -318,6 +319,7 @@ app.get('/api/tours/:id', async (req, res) => {
 
     console.log(`✅ Tour encontrado: ${mapped.title}`);
     console.log(`📹 YouTube URL: ${mapped.youtubeUrl}`);  // ✅ Log para debugging
+    console.log(`🥽 Kuula URL: ${mapped.kuulaUrl}`);  // ✅ Log para debugging
     return res.json(mapped);
   } catch (err) {
     console.error('❌ Error en GET /api/tours/:id:', err);
