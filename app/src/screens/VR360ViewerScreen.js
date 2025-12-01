@@ -1,909 +1,1077 @@
-// src/screens/VR360ViewerScreen.js
-import React, { useState, useEffect, useRef } from 'react';
+// src/screens/VR360ViewerScreen.js - VISOR VR 360° CON YOUTUBE Y KUULA
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  SafeAreaView,
+  StatusBar,
   ActivityIndicator,
   Alert,
-  BackHandler,
-  StatusBar,
+  Linking,
   Platform,
+  ScrollView,
+  Dimensions,
+  Image,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as ScreenOrientation from 'expo-screen-orientation';
-import { DeviceMotion } from 'expo-sensors';
+import { Ionicons } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
 
-// Stores
+// Importar stores
 import useTourStore from '../stores/tourStore';
 import useAnalyticsStore from '../stores/analyticsStore';
 import useTourHistoryStore from '../stores/tourHistoryStore';
 
+// ✅ COLORES INSTITUCIONALES CUORH
+const COLORS = {
+  primary: '#D4AF37',      // Dorado Premium
+  secondary: '#0A1A2F',    // Azul Oscuro Profundo
+  background: '#0A1A2F',   // Fondo Principal
+  card: '#112240',         // Fondo de Tarjetas
+  text: '#E6F1FF',         // Texto Principal
+  subtext: '#8892B0',      // Texto Secundario
+  accent: '#64FFDA',       // Acento Cyan
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#EF4444',
+  border: 'rgba(212, 175, 55, 0.2)',
+};
 
-// Icons
-const CloseIcon = () => <Text style={styles.iconText}>✕</Text>;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const VR360ViewerScreen = ({ route, navigation }) => {
-  // Permite pasar configuraciones opcionales desde la navegación
-  const { tourId, lensRadius = 0.44, lensYOffset = 0.5, lensXOffset = 0 } = route.params;
+  const { tourId, tourTitle, careerId, careerTitle } = route.params || {};
+  
+  // Zustand stores
+  const { currentTour, loadTour, loading: tourLoading } = useTourStore();
+  const { trackScreenView, trackTourStart, trackEvent } = useAnalyticsStore();
   const { recordTourWatch } = useTourHistoryStore();
+  
+  // Estados locales
+  const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState('info'); // 'info' | 'youtube' | 'kuula' | 'instructions'
+  const [youtubeVideoId, setYoutubeVideoId] = useState(null);
+  const [kuulaUrl, setKuulaUrl] = useState(null);
+  const [startTime] = useState(Date.now());
+  const [thumbnailAspectRatio, setThumbnailAspectRatio] = useState(16 / 9); // ✅ Relación de aspecto dinámica para la imagen
+  
+  // ✅ REF para evitar múltiples registros
   const hasRegisteredViewRef = useRef(false);
 
-
-  const [loading, setLoading] = useState(true);
-  const [startTime] = useState(Date.now());
-  const [vrMode, setVrMode] = useState(false);
-  const [gyroAvailable, setGyroAvailable] = useState(false);
-  // Estados locales para controles dinámicos
-  const [lensRadiusState, setLensRadiusState] = useState(lensRadius);
-  const [lensYOffsetState, setLensYOffsetState] = useState(lensYOffset);
-  const [lensXOffsetState, setLensXOffsetState] = useState(lensXOffset);
-  const [showLensControls, setShowLensControls] = useState(false);
-  
-  const { currentTour, loadTour, error, completeTour } = useTourStore();
-  const { trackEvent } = useAnalyticsStore();
-  
-  const webViewRef = useRef(null);
-  const rotationRef = useRef({ alpha: 0, beta: 0, gamma: 0 });
-  const lastUpdateRef = useRef(0);
-
-  // ============================================
-  // GIROSCOPIO
-  // ============================================
-  
   useEffect(() => {
-    let subscription;
+    console.log('🥽 VR360ViewerScreen montada');
+    console.log('📋 Tour ID:', tourId);
+    console.log('📋 Tour Title:', tourTitle);
     
-    const setupGyroscope = async () => {
-      const available = await DeviceMotion.isAvailableAsync();
-      setGyroAvailable(available);
-      
-      if (!available) {
-        console.warn('⚠ Giroscopio no disponible');
-        return;
-      }
-      
-      console.log('✅ Giroscopio disponible');
-      DeviceMotion.setUpdateInterval(16);
-      
-      subscription = DeviceMotion.addListener((data) => {
-        if (!data.rotation || !webViewRef.current) return;
-        
-        const { alpha, beta, gamma } = data.rotation;
-        rotationRef.current = { alpha, beta, gamma };
-        
-        const now = Date.now();
-        if (now - lastUpdateRef.current < 16) return;
-        lastUpdateRef.current = now;
-        
-        const jsCode = `
-          (function() {
-            try {
-              if (typeof updateCameraFromGyro === 'function') {
-                updateCameraFromGyro(${alpha}, ${beta}, ${gamma});
-              }
-            } catch(e) {
-              console.error('Error:', e);
-            }
-          })();
-          true;
-        `;
-        
-        webViewRef.current.injectJavaScript(jsCode);
-      });
-      
-      console.log('✅ Giroscopio activo');
-    };
+    trackScreenView('VR360_Viewer');
+    initializeTour();
     
-    setupGyroscope();
-    
-    return () => {
-      if (subscription) {
-        subscription.remove();
-      }
-    };
-  }, []);
-
-  // ✅ CORREGIDO: Cargar tour al montar
-  useEffect(() => {
-    console.log('🎬 Iniciando VR360ViewerScreen con tourId:', tourId);
-    loadTour(tourId);
-    trackEvent('tour_start', { tourId, type: '360' });
-    
+    // ✅ REGISTRAR TIEMPO DE VISUALIZACIÓN AL SALIR
     return () => {
       const duration = Math.floor((Date.now() - startTime) / 1000);
-      trackEvent('tour_complete', { tourId, duration, type: '360' });
-    };
-  }, [tourId]); // ✅ Solo depender de tourId, NO de currentTour
-
-  // ✅ NUEVO: Efecto separado para registrar visualización SOLO UNA VEZ
-  useEffect(() => {
-    // Solo registrar cuando:
-    // 1. currentTour está cargado
-    // 2. NO se ha registrado antes
-    if (currentTour && currentTour.title && !hasRegisteredViewRef.current) {
-      recordTourWatch(tourId, currentTour.title, '360');
-      hasRegisteredViewRef.current = true; // ✅ Marcar como registrado
-      console.log('✅ Tour VR 360° registrado UNA VEZ:', currentTour.title);
-    }
-  }, [currentTour]); // Solo cuando currentTour cambia
-
-  // ✅ MANTENER todos los demás useEffect sin cambios
-  useEffect(() => {
-    const setOrientation = async () => {
-      try {
-        await ScreenOrientation.lockAsync(
-          ScreenOrientation.OrientationLock.LANDSCAPE
-        );
-      } catch (err) {
-        console.warn('⚠ No se pudo bloquear orientación:', err);
-      }
-    };
-
-    setOrientation();
-
-    return () => {
-      ScreenOrientation.lockAsync(
-        ScreenOrientation.OrientationLock.PORTRAIT
-      ).catch(err => console.warn('Error al restaurar orientación:', err));
-    };
-  }, []);
-
-  useEffect(() => {
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', handleClose);
-    return () => backHandler.remove();
-  }, []);
-
-  // ============================================
-  // GENERAR HTML CON A-FRAME - VISTA MONOSCÓPICA
-  // ============================================
-  
-  const generateHTML = () => {
-    const video360 = currentTour?.multimedia?.find(m => 
-      m.type === '360-video' || m.type === '360-photo' || m.type === '360'
-    );
-    
-    const videoUrl = video360?.url || 
-      'https://res.cloudinary.com/dmezvip8c/video/upload/v1762921740/Lions_360_National_Geographic_-_National_Geographic_1080p_h264_t5ucgw.mp4';
-    
-    const isVideo = !videoUrl.match(/\.(jpg|jpeg|png|webp)$/i);
-    
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-  <title>${currentTour?.title || 'Tour VR 360°'}</title>
-  
-  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: #000;
-      width: 100vw;
-      height: 100vh;
-      position: fixed;
-    }
-    
-    #loading {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: white;
-      font-family: Arial, sans-serif;
-      font-size: 18px;
-      z-index: 10000;
-      text-align: center;
-      background: rgba(0,0,0,0.8);
-      padding: 20px 40px;
-      border-radius: 12px;
-    }
-    
-    #vr-button {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(99, 102, 241, 0.95);
-      color: white;
-      border: none;
-      padding: 20px 40px;
-      border-radius: 50px;
-      font-size: 20px;
-      font-weight: bold;
-      cursor: pointer;
-      z-index: 10000;
-      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
-      min-width: 200px;
-      text-align: center;
-      display: block;
-    }
-    
-    #vr-button:active {
-      background: rgba(79, 70, 229, 1);
-      transform: translate(-50%, -50%) scale(0.95);
-    }
-    
-    #vr-button.hidden {
-      display: none !important;
-    }
-    
-    .a-enter-vr-button { display: none !important; }
-    
-    #scene-container {
-      width: 100vw;
-      height: 100vh;
-      position: relative;
-      overflow: hidden;
-    }
-    
-    /* Modo normal: pantalla completa */
-    #scene-container.normal a-scene {
-      width: 100vw !important;
-      height: 100vh !important;
-    }
-    
-    /* Modo VR: MISMA VISTA DUPLICADA PARA AMBOS OJOS */
-    #scene-container.vr-monoscopic a-scene {
-      width: 200vw !important;
-      height: 100vh !important;
-      transform: translateX(-50vw);
-    }
-    
-    a-scene {
-      display: block;
-      position: absolute;
-      top: 0;
-      left: 0;
-    }
-    
-    /* MÁSCARA VR - DOS CÍRCULOS PARA VISOR VR */
-    #vr-lens-mask {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      pointer-events: none;
-      z-index: 9998;
-      display: none;
-      background: transparent;
-    }
-    
-    #vr-lens-mask.active {
-      display: block;
-    }
-    
-    /* Variables dinámicas para lentes */
-    :root {
-      --lens-radius: ${lensRadius * 100}%;
-      --lens-y-offset: ${lensYOffset * 100}%;
-      --lens-x-offset: ${lensXOffset * 100}%;
-    }
-    
-    /* DOS CÍRCULOS PARA VISOR VR - MISMA VISTA EN AMBOS */
-    #vr-lens-mask::before, #vr-lens-mask::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      width: 50%;
-      height: 100%;
-      background: none;
-    }
-    /* Ojo izquierdo */
-    #vr-lens-mask::before {
-      left: 0;
-      background: radial-gradient(
-        circle at calc(50% + var(--lens-x-offset)) var(--lens-y-offset),
-        transparent 0%,
-        transparent var(--lens-radius),
-        black calc(var(--lens-radius) + 1%),
-        black 100%
-      );
-    }
-    /* Ojo derecho - EXACTAMENTE LA MISMA VISTA */
-    #vr-lens-mask::after {
-      right: 0;
-      background: radial-gradient(
-        circle at calc(50% - var(--lens-x-offset)) var(--lens-y-offset),
-        transparent 0%,
-        transparent var(--lens-radius),
-        black calc(var(--lens-radius) + 1%),
-        black 100%
-      );
-    }
-    
-    #vr-divider {
-      position: fixed;
-      left: 50%;
-      top: 0;
-      width: 3px;
-      height: 100vh;
-      background: #000;
-      z-index: 9997;
-      display: none;
-      transform: translateX(-50%);
-    }
-    
-    #vr-divider.active {
-      display: block;
-    }
-    
-    #gyro-debug {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background: rgba(0,0,0,0.9);
-      color: #10B981;
-      padding: 10px;
-      font-size: 10px;
-      z-index: 9999;
-      font-family: monospace;
-      border-radius: 6px;
-      border: 2px solid #10B981;
-      display: none;
-    }
-  </style>
-</head>
-<body>
-  <div id="loading">
-    <div>⏳ Cargando experiencia VR...</div>
-  </div>
-  
-  <div id="gyro-debug">🎯 GYRO<br>Esperando...</div>
-  
-  <button id="vr-button" onclick="enterVR()">🥽 Entrar a VR</button>
-  <div id="vr-lens-mask"></div>
-  <div id="vr-divider"></div>
-
-  <div id="scene-container" class="normal">
-    <a-scene
-      id="scene"
-      embedded
-      vr-mode-ui="enabled: false"
-      renderer="antialias: true; colorManagement: true"
-      loading-screen="enabled: false"
-    >
-      <a-assets>
-        ${isVideo ? `
-          <video
-            id="video360"
-            src="${videoUrl}"
-            preload="auto"
-            loop
-            crossorigin="anonymous"
-            playsinline
-            webkit-playsinline
-            muted
-          ></video>
-        ` : `
-          <img id="image360" src="${videoUrl}" crossorigin="anonymous">
-        `}
-      </a-assets>
-
-      <!-- ESCENA 360° PRINCIPAL - MISMA PARA AMBOS OJOS -->
-      ${isVideo ? `
-        <a-videosphere src="#video360" rotation="0 0 0" radius="500"></a-videosphere>
-      ` : `
-        <a-sky src="#image360" rotation="0 0 0"></a-sky>
-      `}
-
-      <!-- SOLO UNA CÁMARA - MISMA VISTA PARA AMBOS OJOS -->
-      <a-entity id="rig" movement-controls>
-        <a-entity
-          id="camera"
-          camera="active: true; fov: 80; near: 0.1; far: 2000"
-          position="0 1.6 0"
-          look-controls="pointerLockEnabled: false"
-        ></a-entity>
-      </a-entity>
-    </a-scene>
-  </div>
-
-  <script>
-    const scene = document.querySelector('a-scene');
-    const sceneContainer = document.getElementById('scene-container');
-    const video = document.querySelector('#video360');
-    const loading = document.getElementById('loading');
-    const vrButton = document.getElementById('vr-button');
-    const gyroDebug = document.getElementById('gyro-debug');
-    const lensMask = document.getElementById('vr-lens-mask');
-    const vrDivider = document.getElementById('vr-divider');
-    
-    let isVRMode = false;
-    let sceneLoaded = false;
-    let cameraEl = null;
-    let camera3D = null;
-    let rigEl = null;
-    
-    let targetRotation = { x: 0, y: 0, z: 0 };
-    let currentRotation = { x: 0, y: 0, z: 0 };
-    const smoothing = 0.12;
-    let manualControl = false;
-    let dragStart = null;
-    let startRotationSnapshot = null;
-    
-    console.log('🌐 [WebView] Inicializando - VISTA VR MONOSCÓPICA 360°');
-
-    // FUNCIÓN PRINCIPAL: GIROSCOPIO CONTROLANDO LA MISMA VISTA PARA AMBOS OJOS
-    window.updateCameraFromGyro = function(alpha, beta, gamma) {
-      if (!camera3D || !rigEl) return;
-
-      // Usar valores directos del giroscopio
-      let yaw = alpha;   // rotación Z (izquierda/derecha)
-      let pitch = beta;  // rotación X (arriba/abajo)  
-      let roll = gamma;  // rotación Y (inclinación)
-
-      // Compensar orientación landscape del dispositivo
-      const orientation = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
-      if (orientation === 90) {
-        // Dispositivo en landscape derecho
-        yaw = yaw + Math.PI / 2;
-      } else if (orientation === -90 || orientation === 270) {
-        // Dispositivo en landscape izquierdo
-        yaw = yaw - Math.PI / 2;
-      }
-
-      // Limitar pitch para evitar que se voltee completamente
-      const pitchLimit = Math.PI / 2 - 0.01;
-      if (pitch > pitchLimit) pitch = pitchLimit;
-      if (pitch < -pitchLimit) pitch = -pitchLimit;
-
-      if (!manualControl) {
-        // MISMA rotación para AMBOS ojos - VISTA IDÉNTICA
-        targetRotation = {
-          x: -pitch,  // Invertir pitch para movimiento natural
-          y: yaw,     // Yaw directo
-          z: ${Platform.OS === 'ios' ? '-roll' : 'roll'}  // Ajuste para iOS/Android
-        };
-      }
-
-      // Mostrar debug solo en modo normal
-      if (!isVRMode && gyroDebug) {
-        gyroDebug.style.display = 'block';
-        gyroDebug.innerHTML = '🎯 GIROSCOPIO ACTIVO<br>' +
-          'Pitch: ' + (pitch * 180/Math.PI).toFixed(0) + '°<br>' +
-          'Yaw: ' + (yaw * 180/Math.PI).toFixed(0) + '°<br>' +
-          'Roll: ' + (roll * 180/Math.PI).toFixed(0) + '°';
-      }
-    };
-    
-    // ANIMACIÓN SUAVIZADA - MISMA para ambos ojos
-    function animate() {
-      requestAnimationFrame(animate);
-      
-      if (rigEl && camera3D) {
-        // Suavizado de movimiento - MISMO para ambos ojos
-        currentRotation.x += (targetRotation.x - currentRotation.x) * smoothing;
-        currentRotation.y += (targetRotation.y - currentRotation.y) * smoothing;
-        currentRotation.z += (targetRotation.z - currentRotation.z) * smoothing;
-        
-        // APLICAR LA MISMA ROTACIÓN AL RIG - AMBOS OJOS VEN EXACTAMENTE LO MISMO
-        rigEl.object3D.rotation.set(
-          currentRotation.x,
-          currentRotation.y,
-          currentRotation.z
-        );
-      }
-    }
-    
-    // CUANDO LA ESCENA CARGA
-    scene.addEventListener('loaded', () => {
-      console.log('✅ [WebView] A-Frame cargado - VISTA MONOSCÓPICA LISTA');
-      sceneLoaded = true;
-      
-      // Obtener el rig y la cámara principal
-      rigEl = document.querySelector('#rig');
-      cameraEl = document.querySelector('#camera');
-      
-      if (cameraEl && rigEl) {
-        camera3D = cameraEl.getObject3D('camera');
-        if (camera3D) {
-          console.log('✅ [WebView] Cámara obtenida - VISTA MONOSCÓPICA CONFIGURADA');
-          // Iniciar animación
-          animate();
-        }
-      }
-      
-      // Manejar video o imagen 360
-      if (video) {
-        console.log('🎥 Video 360° detectado');
-        video.muted = true;
-        video.play()
-          .then(() => {
-            console.log('✅ Video 360° reproduciéndose');
-            loading.style.display = 'none';
-            vrButton.classList.remove('hidden');
-            // Quitar mute después de un momento
-            setTimeout(() => { 
-              video.muted = false;
-              console.log('🔊 Audio activado');
-            }, 500);
-          })
-          .catch((error) => {
-            console.error('❌ Error reproduciendo video:', error);
-            loading.style.display = 'none';
-            vrButton.classList.remove('hidden');
-          });
-      } else {
-        // Es una imagen 360
-        setTimeout(() => {
-          loading.style.display = 'none';
-          vrButton.classList.remove('hidden');
-          console.log('🖼 Imagen 360° cargada');
-        }, 1000);
-      }
-    });
-    
-    // ENTRAR AL MODO VR - VISTA MONOSCÓPICA (MISMA EN AMBOS OJOS)
-    function enterVR() {
-      if (!sceneLoaded) {
-        alert('La escena aún está cargando...');
-        return;
-      }
-      
-      console.log('🥽 [WebView] Entrando a modo VR - VISTA MONOSCÓPICA ACTIVADA');
-      
-      // Ocultar elementos de UI
-      vrButton.classList.add('hidden');
-      if (gyroDebug) gyroDebug.style.display = 'none';
-      isVRMode = true;
-      
-      // Activar modo VR - MISMA VISTA DUPLICADA
-      sceneContainer.classList.remove('normal');
-      sceneContainer.classList.add('vr-monoscopic');
-      
-      // Activar máscaras de lentes - DOS CÍRCULOS CON LA MISMA VISTA
-      lensMask.classList.add('active');
-      vrDivider.classList.add('active');
-      
-      console.log('✅ Modo VR activado - AMBOS OJOS VEN EXACTAMENTE LO MISMO');
-      
-      // Asegurar que el video se reproduzca
-      if (video && video.paused) {
-        video.play().catch(e => console.error('Error reproduciendo video en VR:', e));
-      }
-      
-      // Notificar a React Native
-      sendToRN({ type: 'vr_mode_changed', vrMode: true });
-    }
-    
-    // SALIR DEL MODO VR
-    function exitVR() {
-      console.log('👋 [WebView] Saliendo de VR');
-      isVRMode = false;
-      
-      // Mostrar botón nuevamente
-      vrButton.classList.remove('hidden');
-      
-      // Volver a modo normal
-      sceneContainer.classList.remove('vr-monoscopic');
-      sceneContainer.classList.add('normal');
-      
-      // Desactivar máscaras
-      lensMask.classList.remove('active');
-      vrDivider.classList.remove('active');
-      
-      sendToRN({ type: 'vr_mode_changed', vrMode: false });
-    }
-    
-    // COMUNICACIÓN CON REACT NATIVE
-    function sendToRN(message) {
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify(message));
-      }
-    }
-
-    // ACTUALIZAR CONFIGURACIÓN DE LENTES
-    window.updateLensConfig = function(cfg = {}) {
-      const r = (typeof cfg.radius === 'number') ? (cfg.radius * 100) + '%' : null;
-      const y = (typeof cfg.yOffset === 'number') ? (cfg.yOffset * 100) + '%' : null;
-      const x = (typeof cfg.xOffset === 'number') ? (cfg.xOffset * 100) + '%' : null;
-      const rootStyle = document.documentElement.style;
-      if (r) rootStyle.setProperty('--lens-radius', r);
-      if (y) rootStyle.setProperty('--lens-y-offset', y);
-      if (x) rootStyle.setProperty('--lens-x-offset', x);
-      sendToRN({ type: 'lens_config_updated', config: { radius: cfg.radius, yOffset: cfg.yOffset, xOffset: cfg.xOffset } });
-    };
-    
-    // MANEJAR FIN DEL VIDEO
-    if (video) {
-      video.addEventListener('ended', () => {
-        console.log('🏁 Video 360° terminado');
-        sendToRN({ type: 'video_ended' });
+      trackEvent('vr360_viewer_close', {
+        tourId,
+        tourTitle,
+        duration,
+        viewMode,
       });
-    }
-    
-    // DOBLE TAP PARA SALIR DE VR
-    let lastTap = 0;
-    document.addEventListener('click', (e) => {
-      if (isVRMode) {
-        const currentTime = new Date().getTime();
-        const tapLength = currentTime - lastTap;
-        
-        if (tapLength < 300 && tapLength > 0) {
-          // Doble tap detectado - salir de VR
-          exitVR();
-        }
-        
-        lastTap = currentTime;
+      console.log(`⏱️ Tiempo en VR360 Viewer: ${duration} segundos`);
+    };
+  }, [tourId]);
+
+  // ✅ INICIALIZAR TOUR
+  const initializeTour = async () => {
+    try {
+      setLoading(true);
+      
+      // Cargar datos del tour
+      const tour = await loadTour(tourId);
+      console.log('✅ Tour VR 360° cargado:', tour);
+      
+      // ✅ VERIFICAR THUMBNAIL URL
+      console.log('🖼️ thumbnailUrl del tour:', tour?.thumbnailUrl);
+      console.log('🖼️ Todos los campos del tour:', Object.keys(tour || {}));
+      
+      // Extraer YouTube Video ID
+      const videoId = extractYoutubeVideoId(tour);
+      if (videoId) {
+        setYoutubeVideoId(videoId);
+        console.log('✅ YouTube Video ID extraído:', videoId);
       }
+      
+      // ✅ EXTRAER KUULA URL
+      const extractedKuulaUrl = extractKuulaUrl(tour);
+      if (extractedKuulaUrl) {
+        setKuulaUrl(extractedKuulaUrl);
+        console.log('✅ Kuula URL extraída:', extractedKuulaUrl);
+      }
+      
+      // Registrar analytics
+      trackTourStart(tourId, tourTitle, careerId);
+      
+    } catch (error) {
+      console.error('❌ Error cargando tour VR:', error);
+      Alert.alert(
+        'Error',
+        'No se pudo cargar el tour VR 360°',
+        [{ text: 'Volver', onPress: () => navigation.goBack() }]
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ NUEVO: Registrar visualización SOLO UNA VEZ cuando el tour se carga
+  useEffect(() => {
+    if (currentTour && currentTour.title && !hasRegisteredViewRef.current) {
+      recordTourWatch(tourId, currentTour.title, 'vr360');
+      hasRegisteredViewRef.current = true;
+      console.log(`✅ Tour VR 360° registrado UNA VEZ: ${currentTour.title}`);
+    }
+  }, [currentTour]);
+
+  // ✅ EXTRAER VIDEO ID DE YOUTUBE
+  const extractYoutubeVideoId = (tour) => {
+    if (!tour) return null;
+
+    const possibleFields = [
+      tour.youtubeUrl,
+      tour.videoUrl,
+      tour.vrUrl,
+      tour.video360Url,
+      tour.url,
+      tour.youtubeVideoId,
+      tour.videoId,
+    ];
+
+    for (const field of possibleFields) {
+      if (!field) continue;
+
+      if (typeof field === 'string' && field.length === 11 && /^[a-zA-Z0-9_-]+$/.test(field)) {
+        return field;
+      }
+
+      const patterns = [
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+        /^([a-zA-Z0-9_-]{11})$/,
+      ];
+
+      for (const pattern of patterns) {
+        const match = String(field).match(pattern);
+        if (match && match[1]) {
+          return match[1];
+        }
+      }
+    }
+
+    return null;
+  };
+
+  // ✅ NUEVO: EXTRAER KUULA URL
+  const extractKuulaUrl = (tour) => {
+    if (!tour) return null;
+
+    // Buscar en diferentes campos posibles
+    const possibleFields = [
+      tour.kuulaUrl,
+      tour.kuulaLink,
+      tour.vrNativeUrl,
+      tour.vr360Url,
+      tour.kuula,
+    ];
+
+    for (const field of possibleFields) {
+      if (!field) continue;
+
+      // Si es una URL completa de Kuula
+      if (typeof field === 'string' && field.includes('kuula.co')) {
+        // Limpiar URL y agregar parámetros optimizados
+        const cleanUrl = field.split('?')[0]; // Remover parámetros existentes
+        return `${cleanUrl}?logo=0&info=0&fs=1&vr=1&sd=1&thumbs=-1&keys=0&inst=0`;
+      }
+    }
+
+    return null;
+  };
+
+  // ✅ ABRIR EN YOUTUBE APP
+  const openInYouTubeApp = useCallback(async () => {
+    if (!youtubeVideoId) {
+      Alert.alert('Error', 'No hay video de YouTube disponible para este tour');
+      return;
+    }
+
+    try {
+      const openTime = Date.now();
+      trackEvent('vr360_youtube_app_open', {
+        tourId,
+        tourTitle,
+        videoId: youtubeVideoId,
+        timestamp: openTime,
+      });
+
+      console.log('📹 Abriendo YouTube para tour VR 360°:', tourTitle);
+
+      const youtubeAppUrl = `youtube://${youtubeVideoId}`;
+      const youtubeBrowserUrl = `https://youtu.be/${youtubeVideoId}`;
+
+      const canOpen = await Linking.canOpenURL(youtubeAppUrl);
+
+      if (canOpen) {
+        console.log('📱 Abriendo en YouTube app...');
+        await Linking.openURL(youtubeAppUrl);
+      } else {
+        console.log('🌐 Abriendo en navegador...');
+        await Linking.openURL(youtubeBrowserUrl);
+      }
+    } catch (error) {
+      console.error('❌ Error abriendo YouTube:', error);
+      Alert.alert('Error', 'No se pudo abrir YouTube');
+    }
+  }, [youtubeVideoId, tourId, tourTitle]);
+
+  // ✅ VER EN MODO EMBEBIDO YOUTUBE
+  const viewEmbedded = useCallback(() => {
+    if (!youtubeVideoId) {
+      Alert.alert('Error', 'No hay video disponible');
+      return;
+    }
+
+    trackEvent('vr360_embedded_view', {
+      tourId,
+      tourTitle,
+      videoId: youtubeVideoId,
     });
 
-    // CONTROL TÁCTIL MANUAL - MISMA rotación para ambos ojos
-    function onTouchStart(e) {
-      if (!isVRMode) return;
-      manualControl = true;
-      const touch = e.touches[0];
-      dragStart = { x: touch.clientX, y: touch.clientY };
-      startRotationSnapshot = { ...targetRotation };
-    }
-    
-    function onTouchMove(e) {
-      if (!manualControl || !dragStart) return;
-      const touch = e.touches[0];
-      const dx = touch.clientX - dragStart.x;
-      const dy = touch.clientY - dragStart.y;
-      
-      // Sensibilidad del movimiento táctil
-      const sensitivityX = 0.003;
-      const sensitivityY = 0.003;
-      
-      let newYaw = startRotationSnapshot.y - dx * sensitivityX;
-      let newPitch = startRotationSnapshot.x + dy * sensitivityY;
-      
-      // Limitar movimiento vertical
-      const limit = Math.PI / 2 - 0.01;
-      if (newPitch < -limit) newPitch = -limit;
-      if (newPitch > limit) newPitch = limit;
-      
-      // MISMA rotación aplicada a AMBOS ojos
-      targetRotation.y = newYaw;
-      targetRotation.x = newPitch;
-    }
-    
-    function onTouchEnd() {
-      dragStart = null;
-      // Volver al control del giroscopio después de un tiempo
-      setTimeout(() => { manualControl = false; }, 1500);
-    }
-    
-    // EVENTOS TÁCTILES
-    document.addEventListener('touchstart', onTouchStart, { passive: true });
-    document.addEventListener('touchmove', onTouchMove, { passive: true });
-    document.addEventListener('touchend', onTouchEnd, { passive: true });
-  </script>
-</body>
-</html>
-    `;
-  };
+    setViewMode('youtube');
+  }, [youtubeVideoId, tourId, tourTitle]);
 
-  const handleClose = () => {
-    Alert.alert(
-      'Salir del Tour VR',
-      '¿Estás seguro de que quieres salir?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Salir',
-          style: 'destructive',
-          onPress: () => {
-            completeTour();
-            navigation.goBack();
-          },
-        },
-      ]
-    );
-    return true;
-  };
+  // ✅ NUEVO: VER EN KUULA (MODO VR NATIVO)
+  const viewKuulaNative = useCallback(() => {
+    if (!kuulaUrl) {
+      Alert.alert(
+        'Video VR no disponible',
+        'Este tour aún no tiene un video 360° en modo VR nativo. Por favor, usa la opción de YouTube.',
+        [{ text: 'Entendido' }]
+      );
+      return;
+    }
 
-  const handleMessage = (event) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      
-      if (data.type === 'video_ended') {
-        Alert.alert('Tour completado', '¿Deseas verlo de nuevo?', [
-          { text: 'Salir', onPress: () => navigation.goBack() },
-          { 
-            text: 'Ver de nuevo', 
-            onPress: () => {
-              webViewRef.current?.injectJavaScript(`
-                if (video) {
-                  video.currentTime = 0;
-                  video.play();
+    trackEvent('vr360_kuula_native_view', {
+      tourId,
+      tourTitle,
+      kuulaUrl,
+    });
+
+    console.log('🥽 Abriendo visor VR nativo con Kuula:', kuulaUrl);
+    setViewMode('kuula');
+  }, [kuulaUrl, tourId, tourTitle]);
+
+  // ✅ VER INSTRUCCIONES VR
+  const showInstructions = useCallback(() => {
+    setViewMode('instructions');
+  }, []);
+
+  // ✅ RENDERIZAR CONTENIDO SEGÚN MODO
+  const renderContent = () => {
+    // Loading
+    if (loading || tourLoading) {
+      return (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Cargando tour VR 360°...</Text>
+        </View>
+      );
+    }
+
+    // Sin video disponible
+    if (!youtubeVideoId && !kuulaUrl) {
+      return (
+        <View style={styles.centerContainer}>
+          <Ionicons name="videocam-off-outline" size={64} color={COLORS.subtext} />
+          <Text style={styles.errorTitle}>Video no disponible</Text>
+          <Text style={styles.errorSubtitle}>
+            Este tour aún no tiene un video 360° asignado
+          </Text>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>Volver</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    // ✅ MODO KUULA (VR NATIVO)
+    if (viewMode === 'kuula') {
+      // ✅ JavaScript simple para bajar solo un poco los controles superiores
+      const injectedJS = `
+        (function() {
+          function adjustControls() {
+            // Buscar solo elementos en la parte superior (top < 50px)
+            const allElements = document.querySelectorAll('*');
+            allElements.forEach(el => {
+              try {
+                const style = window.getComputedStyle(el);
+                if ((style.position === 'absolute' || style.position === 'fixed') && style.top !== 'auto') {
+                  const top = parseInt(style.top);
+                  // Solo ajustar elementos que están muy arriba (top < 50px)
+                  if (top >= 0 && top < 50) {
+                    // Bajar solo 30px manteniendo posición relativa
+                    el.style.top = (top + 30) + 'px';
+                    console.log('✅ Control ajustado ligeramente');
+                  }
                 }
-                true;
-              `);
+              } catch(e) {}
+            });
+          }
+          
+          // Ejecutar después de que cargue
+          setTimeout(adjustControls, 1000);
+          setTimeout(adjustControls, 2500);
+        })();
+        true;
+      `;
+      
+      return (
+        <View style={styles.webviewContainer}>
+          <WebView
+            source={{ uri: kuulaUrl }}
+            allowsFullscreenVideo={true}
+            allowsInlineMediaPlayback={true}
+            mediaPlaybackRequiresUserAction={false}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            originWhitelist={['*']}
+            injectedJavaScript={injectedJS}
+            onMessage={(event) => {
+              console.log('📩 Mensaje de Kuula:', event.nativeEvent.data);
+            }}
+            style={styles.webview}
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.error('❌ WebView error (Kuula):', nativeEvent);
+            }}
+            onLoadStart={() => console.log('🔄 Kuula cargando...')}
+            onLoadEnd={() => {
+              console.log('✅ Kuula cargado');
+            }}
+          />
+          <TouchableOpacity
+            style={styles.floatingBackButton}
+            onPress={() => setViewMode('info')}
+          >
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    // Modo YouTube embebido
+    if (viewMode === 'youtube') {
+      return (
+        <View style={styles.webviewContainer}>
+          <WebView
+            source={{
+              uri: `https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&playsinline=1&modestbranding=1&rel=0`,
+            }}
+            allowsFullscreenVideo
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            style={styles.webview}
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.error('❌ WebView error (YouTube):', nativeEvent);
+            }}
+          />
+          <TouchableOpacity
+            style={styles.floatingBackButton}
+            onPress={() => setViewMode('info')}
+          >
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    // Modo instrucciones
+    if (viewMode === 'instructions') {
+      return (
+        <ScrollView style={styles.instructionsContainer} contentContainerStyle={styles.instructionsContent}>
+          <TouchableOpacity
+            style={styles.closeInstructions}
+            onPress={() => setViewMode('info')}
+          >
+            <Ionicons name="close" size={28} color={COLORS.primary} />
+          </TouchableOpacity>
+
+          <Text style={styles.instructionsTitle}>🥽 Cómo usar el modo VR</Text>
+
+          <View style={styles.instructionCard}>
+            <View style={styles.instructionNumber}>
+              <Text style={styles.instructionNumberText}>1</Text>
+            </View>
+            <View style={styles.instructionTextContainer}>
+              <Text style={styles.instructionStepTitle}>Usa el visor VR nativo</Text>
+              <Text style={styles.instructionStepText}>
+                Presiona el botón "Ver en Modo VR (en app)" para abrir el visor integrado sin salir de la aplicación
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.instructionCard}>
+            <View style={styles.instructionNumber}>
+              <Text style={styles.instructionNumberText}>2</Text>
+            </View>
+            <View style={styles.instructionTextContainer}>
+              <Text style={styles.instructionStepTitle}>Explora con tu teléfono</Text>
+              <Text style={styles.instructionStepText}>
+                Mueve tu teléfono en cualquier dirección - el giroscopio te permitirá mirar alrededor
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.instructionCard}>
+            <View style={styles.instructionNumber}>
+              <Text style={styles.instructionNumberText}>3</Text>
+            </View>
+            <View style={styles.instructionTextContainer}>
+              <Text style={styles.instructionStepTitle}>Activa el modo VR</Text>
+              <Text style={styles.instructionStepText}>
+                Dentro del visor, toca el ícono de gafas VR para activar el modo estereoscópico
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.instructionCard}>
+            <View style={styles.instructionNumber}>
+              <Text style={styles.instructionNumberText}>4</Text>
+            </View>
+            <View style={styles.instructionTextContainer}>
+              <Text style={styles.instructionStepTitle}>Usa tus gafas VR</Text>
+              <Text style={styles.instructionStepText}>
+                Coloca tu teléfono en gafas Cardboard o similar y explora {careerTitle || 'la carrera'} en 360°
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.tipsCard}>
+            <Text style={styles.tipsTitle}>💡 Consejos</Text>
+            <Text style={styles.tipText}>• El modo VR nativo funciona completamente dentro de la app</Text>
+            <Text style={styles.tipText}>• Usa audífonos para una experiencia inmersiva completa</Text>
+            <Text style={styles.tipText}>• Asegúrate de estar en un lugar seguro antes de ponerte las gafas</Text>
+            <Text style={styles.tipText}>• Si te mareas, toma un descanso y quítate las gafas</Text>
+            <Text style={styles.tipText}>• La calidad del video se mejora con mejor conexión a internet o subiendo la calidad desde el apartado configuraciones</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.gotItButton}
+            onPress={() => setViewMode('info')}
+          >
+            <Text style={styles.gotItButtonText}>¡Entendido!</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      );
+    }
+
+    // Modo info (pantalla principal)
+    return (
+      <ScrollView style={styles.infoContainer} contentContainerStyle={styles.infoContent}>
+        {/* Header con título del tour */}
+        <View style={styles.tourHeader}>
+          <View style={styles.vrBadge}>
+            <Ionicons name="glasses-outline" size={20} color={COLORS.primary} />
+            <Text style={styles.vrBadgeText}>VR 360°</Text>
+          </View>
+          <Text style={styles.tourTitleText}>{tourTitle || 'Tour Virtual'}</Text>
+          {careerTitle && (
+            <Text style={styles.careerSubtitle}>{careerTitle}</Text>
+          )}
+        </View>
+
+        {/* Thumbnail */}
+        <View style={[styles.thumbnailContainer, { aspectRatio: thumbnailAspectRatio }]}>
+          {(() => {
+            // ✅ Cargar automáticamente imagen de Cloudinary si existe thumbnailUrl
+            const thumbnailUrl = currentTour?.thumbnailUrl;
+            
+            if (thumbnailUrl) {
+              // Calcular relación de aspecto real para adaptar el tamaño del contenedor
+              Image.getSize(
+                thumbnailUrl,
+                (width, height) => {
+                  if (width && height) {
+                    const ratio = width / height;
+                    if (ratio > 0 && ratio !== thumbnailAspectRatio) {
+                      setThumbnailAspectRatio(ratio);
+                    }
+                  }
+                },
+                (error) => {
+                  console.error('❌ Error obteniendo tamaño de la imagen de Cloudinary:', error);
+                }
+              );
+              
+              return (
+                <Image
+                  source={{ uri: thumbnailUrl }}
+                  style={styles.thumbnail}
+                  resizeMode="cover"
+                  onError={(error) => {
+                    console.error('❌ Error cargando imagen de Cloudinary:', error);
+                  }}
+                />
+              );
+            } else {
+              // Si no hay thumbnailUrl, mostrar placeholder
+              return (
+                <View style={styles.thumbnailPlaceholder}>
+                  <Ionicons name="globe-outline" size={80} color={COLORS.primary} />
+                </View>
+              );
             }
-          },
-        ]);
-      } else if (data.type === 'vr_mode_changed') {
-        setVrMode(data.vrMode);
-        if (data.vrMode) {
-          // Enviar configuración inicial de lentes al entrar a VR
-          sendLensConfig(lensRadiusState, lensYOffsetState, lensXOffsetState);
-        }
-      } else if (data.type === 'lens_config_updated') {
-        console.log('Configuración de lentes actualizada en WebView');
-      }
-    } catch (err) {
-      console.warn('Error procesando mensaje:', err);
-    }
-  };
+          })()}
+        </View>
 
-  const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
+        {/* Descripción */}
+        {currentTour?.description && (
+          <View style={styles.descriptionCard}>
+            <Text style={styles.descriptionTitle}>Acerca de este tour</Text>
+            <Text style={styles.descriptionText}>{currentTour.description}</Text>
+          </View>
+        )}
 
-  const sendLensConfig = (r, y, x) => {
-    if (!webViewRef.current) return;
-const js = `updateLensConfig({ radius: ${r.toFixed(3)}, yOffset: ${y.toFixed(3)}, xOffset: ${x.toFixed(3)} }); true;`;
-    webViewRef.current.injectJavaScript(js);
-  };
+        {/* Detalles del tour */}
+        <View style={styles.detailsCard}>
+          <View style={styles.detailRow}>
+            <Ionicons name="time-outline" size={20} color={COLORS.primary} />
+            <Text style={styles.detailText}>
+              {currentTour?.duration || 'Duración variable'}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Ionicons name="eye-outline" size={20} color={COLORS.primary} />
+            <Text style={styles.detailText}>Experiencia 360° inmersiva</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Ionicons name="phone-portrait-outline" size={20} color={COLORS.primary} />
+            <Text style={styles.detailText}>Compatible con gafas VR</Text>
+          </View>
+        </View>
 
-  const handleAdjust = (field, delta) => {
-    if (field === 'radius') {
-      const newVal = clamp(lensRadiusState + delta, 0.30, 0.60);
-      setLensRadiusState(newVal);
-      sendLensConfig(newVal, lensYOffsetState, lensXOffsetState);
-    } else if (field === 'yOffset') {
-      const newVal = clamp(lensYOffsetState + delta, 0.40, 0.60);
-      setLensYOffsetState(newVal);
-      sendLensConfig(lensRadiusState, newVal, lensXOffsetState);
-    } else if (field === 'xOffset') {
-      const newVal = clamp(lensXOffsetState + delta, -0.05, 0.05);
-      setLensXOffsetState(newVal);
-      sendLensConfig(lensRadiusState, lensYOffsetState, newVal);
-    }
-  };
+        {/* ✅ BOTONES DE ACCIÓN - 3 BOTONES INDEPENDIENTES */}
+        <View style={styles.actionsContainer}>
+          {/* ✅ BOTÓN 1: YouTube (Dorado - Primario) */}
+          {youtubeVideoId && (
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={openInYouTubeApp}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#D4AF37', '#B8941F']}
+                style={styles.primaryButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Ionicons name="logo-youtube" size={24} color={COLORS.secondary} />
+                <Text style={styles.primaryButtonText}>Abrir en YouTube</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
 
-  if (loading && !currentTour) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6366F1" />
-        <Text style={styles.loadingText}>Cargando experiencia VR 360°...</Text>
-      </View>
+          {/* ✅ BOTÓN 2: Ver aquí en el teléfono - Kuula (Secundario) */}
+          {kuulaUrl && (
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={viewKuulaNative}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="phone-portrait-outline" size={22} color={COLORS.accent} />
+              <Text style={styles.vrNativeButtonText}>Ver aquí en el teléfono</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* ✅ BOTÓN 3: Instrucciones (Terciario) */}
+          <TouchableOpacity
+            style={styles.helpButton}
+            onPress={showInstructions}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="help-circle-outline" size={22} color={COLORS.accent} />
+            <Text style={styles.helpButtonText}>¿Cómo usar el modo VR?</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Nota informativa */}
+        <View style={styles.infoNote}>
+          <Ionicons name="information-circle-outline" size={20} color={COLORS.accent} />
+          <Text style={styles.infoNoteText}>
+            {kuulaUrl 
+              ? 'El visor VR nativo funciona como imagen 360°, para utilizar gafas VR ir a Youtube'
+              : 'Para la mejor experiencia VR, abre el video en YouTube y activa el modo Cardboard'
+            }
+          </Text>
+        </View>
+      </ScrollView>
     );
-  }
-
-  if (error || !currentTour) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>❌ Error al cargar el tour</Text>
-        <Text style={styles.errorSubtext}>{error}</Text>
-        <TouchableOpacity style={styles.errorButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.errorButtonText}>Volver</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  };
 
   return (
     <View style={styles.container}>
-      <StatusBar hidden />
-      
-      <WebView
-        ref={webViewRef}
-        source={{ html: generateHTML() }}
-        style={styles.webview}
-        onLoadStart={() => setLoading(true)}
-        onLoadEnd={() => setLoading(false)}
-        onMessage={handleMessage}
-        allowsInlineMediaPlayback
-        mediaPlaybackRequiresUserAction={false}
-        javaScriptEnabled
-        domStorageEnabled
-        allowsFullscreenVideo
-        mixedContentMode="always"
-        originWhitelist={['*']}
-      />
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.secondary} />
 
-      {!vrMode && (
-        <View style={styles.topOverlay}>
-          <LinearGradient
-            colors={['rgba(0,0,0,0.6)', 'transparent']}
-            style={styles.topGradient}
-          >
-            <View style={styles.topBar}>
-              <TouchableOpacity onPress={handleClose} style={styles.topButton}>
-                <CloseIcon />
+      {/* Header con gradiente */}
+      {viewMode === 'info' && (
+        <LinearGradient
+          colors={[COLORS.secondary, '#0F2A4A']}
+          style={styles.header}
+        >
+          <SafeAreaView>
+            <View style={styles.headerContent}>
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={() => navigation.goBack()}
+              >
+                <Ionicons name="arrow-back" size={24} color={COLORS.primary} />
               </TouchableOpacity>
-              
-              <View style={styles.tourInfo}>
-                <Text style={styles.tourTitle} numberOfLines={1}>
-                  {currentTour.title}
-                </Text>
-                <Text style={styles.tourType}>Tour VR 360°</Text>
-              </View>
-              
-              <View style={styles.topButton} />
+              <Text style={styles.headerTitle}>Tour VR 360°</Text>
+              <View style={styles.headerButton} />
             </View>
-          </LinearGradient>
-        </View>
+          </SafeAreaView>
+        </LinearGradient>
       )}
 
-      {vrMode && (
-        <>
-          <TouchableOpacity
-            style={styles.gearButton}
-            onPress={() => setShowLensControls(!showLensControls)}
-          >
-            <Text style={styles.gearText}>{showLensControls ? '✕' : '⚙'}</Text>
-          </TouchableOpacity>
-          {showLensControls && (
-            <View style={styles.lensPanel}>
-              <Text style={styles.panelTitle}>Ajustes Lentes</Text>
-              <View style={styles.row}> 
-                <Text style={styles.label}>Radio: {lensRadiusState.toFixed(2)}</Text>
-                <View style={styles.buttonsRow}>
-                  <TouchableOpacity style={styles.adjustBtn} onPress={() => handleAdjust('radius', -0.01)}><Text style={styles.btnText}>-</Text></TouchableOpacity>
-                  <TouchableOpacity style={styles.adjustBtn} onPress={() => handleAdjust('radius', +0.01)}><Text style={styles.btnText}>+</Text></TouchableOpacity>
-                </View>
-              </View>
-              <View style={styles.row}> 
-                <Text style={styles.label}>Vertical: {lensYOffsetState.toFixed(2)}</Text>
-                <View style={styles.buttonsRow}>
-                  <TouchableOpacity style={styles.adjustBtn} onPress={() => handleAdjust('yOffset', -0.01)}><Text style={styles.btnText}>-</Text></TouchableOpacity>
-                  <TouchableOpacity style={styles.adjustBtn} onPress={() => handleAdjust('yOffset', +0.01)}><Text style={styles.btnText}>+</Text></TouchableOpacity>
-                </View>
-              </View>
-              <View style={styles.row}> 
-                <Text style={styles.label}>Horizontal: {lensXOffsetState.toFixed(3)}</Text>
-                <View style={styles.buttonsRow}>
-                  <TouchableOpacity style={styles.adjustBtn} onPress={() => handleAdjust('xOffset', -0.005)}><Text style={styles.btnText}>-</Text></TouchableOpacity>
-                  <TouchableOpacity style={styles.adjustBtn} onPress={() => handleAdjust('xOffset', +0.005)}><Text style={styles.btnText}>+</Text></TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          )}
-        </>
-      )}
-
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#6366F1" />
-          <Text style={styles.loadingOverlayText}>Cargando video 360°...</Text>
-        </View>
-      )}
+      {/* Contenido principal */}
+      <View style={styles.content}>
+        {renderContent()}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  webview: { flex: 1, backgroundColor: '#000' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1F2937' },
-  loadingText: { marginTop: 16, fontSize: 16, color: '#F3F4F6' },
-  loadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.7)' },
-  loadingOverlayText: { marginTop: 16, fontSize: 16, color: '#F3F4F6' },
-  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1F2937', padding: 24 },
-  errorText: { fontSize: 20, color: '#EF4444', marginBottom: 8, textAlign: 'center' },
-  errorSubtext: { fontSize: 14, color: '#9CA3AF', marginBottom: 24, textAlign: 'center' },
-  errorButton: { backgroundColor: '#6366F1', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
-  errorButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  topOverlay: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-  topGradient: { paddingTop: 50, paddingBottom: 20, paddingHorizontal: 16 },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  topButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  tourInfo: { flex: 1, marginHorizontal: 12, alignItems: 'center' },
-  tourTitle: { fontSize: 18, fontWeight: '700', color: '#fff', textAlign: 'center' },
-  tourType: { fontSize: 12, color: '#D1D5DB', marginTop: 2 },
-  iconText: { fontSize: 24, color: '#fff' },
-  gearButton: { position: 'absolute', top: 20, right: 20, zIndex: 20, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 24 },
-  gearText: { color: '#fff', fontSize: 18 },
-  lensPanel: { position: 'absolute', top: 70, right: 20, zIndex: 20, width: 200, backgroundColor: 'rgba(0,0,0,0.75)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#6366F1' },
-  panelTitle: { color: '#fff', fontSize: 14, fontWeight: '700', marginBottom: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  label: { color: '#D1D5DB', fontSize: 12, flex: 1, marginRight: 4 },
-  buttonsRow: { flexDirection: 'row' },
-  adjustBtn: { backgroundColor: '#6366F1', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, marginLeft: 6 },
-  btnText: { color: '#fff', fontSize: 14, fontWeight: '600' }
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+
+  // ✅ HEADER
+  header: {
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  headerButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(212, 175, 55, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.3)',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text,
+    letterSpacing: 0.5,
+  },
+
+  // ✅ CONTENIDO
+  content: {
+    flex: 1,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: COLORS.subtext,
+    fontWeight: '600',
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  errorSubtitle: {
+    fontSize: 14,
+    color: COLORS.subtext,
+    marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 32,
+  },
+  backButton: {
+    marginTop: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+
+  // ✅ INFO MODE
+  infoContainer: {
+    flex: 1,
+  },
+  infoContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  tourHeader: {
+    marginBottom: 24,
+  },
+  vrBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(212, 175, 55, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    marginBottom: 12,
+  },
+  vrBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
+    marginLeft: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  tourTitleText: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: COLORS.text,
+    marginBottom: 8,
+    lineHeight: 36,
+  },
+  careerSubtitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.subtext,
+  },
+
+  // ✅ THUMBNAIL
+  thumbnailContainer: {
+    position: 'relative',
+    width: '100%',
+    // La altura se controla con aspectRatio dinámico
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbnailPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: COLORS.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  thumbnailOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10, 26, 47, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // ✅ DESCRIPCIÓN
+  descriptionCard: {
+    backgroundColor: COLORS.card,
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  descriptionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.primary,
+    marginBottom: 12,
+  },
+  descriptionText: {
+    fontSize: 14,
+    color: COLORS.subtext,
+    lineHeight: 22,
+  },
+
+  // ✅ DETALLES
+  detailsCard: {
+    backgroundColor: COLORS.card,
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  detailText: {
+    fontSize: 14,
+    color: COLORS.text,
+    marginLeft: 12,
+    fontWeight: '600',
+  },
+
+  // ✅ ACCIONES
+  actionsContainer: {
+    marginBottom: 20,
+  },
+  primaryButton: {
+    marginBottom: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  primaryButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+  },
+  primaryButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.secondary,
+    marginLeft: 10,
+    letterSpacing: 0.5,
+  },
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 12,
+  },
+  vrNativeButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.accent,
+    marginLeft: 8,
+  },
+  helpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(100, 255, 218, 0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(100, 255, 218, 0.2)',
+  },
+  helpButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.accent,
+    marginLeft: 8,
+  },
+
+  // ✅ NOTA INFORMATIVA
+  infoNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(100, 255, 218, 0.05)',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(100, 255, 218, 0.2)',
+  },
+  infoNoteText: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.accent,
+    marginLeft: 10,
+    lineHeight: 20,
+  },
+
+  // ✅ WEBVIEW MODE
+  webviewContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  floatingBackButton: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? StatusBar.currentHeight + 16 : 60,
+    left: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(10, 26, 47, 0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+
+  // ✅ INSTRUCCIONES
+  instructionsContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  instructionsContent: {
+    padding: 20,
+    paddingBottom: 40,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 20 : 60,
+  },
+  closeInstructions: {
+    alignSelf: 'flex-end',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  instructionsTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: COLORS.text,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  instructionCard: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.card,
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  instructionNumber: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(212, 175, 55, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+  },
+  instructionNumberText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  instructionTextContainer: {
+    flex: 1,
+  },
+  instructionStepTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 6,
+  },
+  instructionStepText: {
+    fontSize: 14,
+    color: COLORS.subtext,
+    lineHeight: 20,
+  },
+  tipsCard: {
+    backgroundColor: 'rgba(100, 255, 218, 0.05)',
+    padding: 20,
+    borderRadius: 16,
+    marginTop: 8,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(100, 255, 218, 0.2)',
+  },
+  tipsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.accent,
+    marginBottom: 12,
+  },
+  tipText: {
+    fontSize: 13,
+    color: COLORS.accent,
+    lineHeight: 22,
+    marginBottom: 6,
+  },
+  gotItButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  gotItButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.secondary,
+    letterSpacing: 0.5,
+  },
 });
 
 export default VR360ViewerScreen;
