@@ -248,6 +248,8 @@ async function startServer() {
             careerId: t.careerId?.toString() || t.career?.toString() || null,
             type: t.type || 'AR',
             youtubeUrl: youtubeUrl || null,  // ✅ INCLUIR ESTE CAMPO
+            kuulaUrl: t.kuulaUrl || null,  // ✅ INCLUIR ESTE CAMPO
+            thumbnailUrl: t.thumbnailUrl || null,  // ✅ NUEVO: Imagen de Cloudinary
             multimedia: []
           };
         });
@@ -312,6 +314,7 @@ app.get('/api/tours/:id', async (req, res) => {
       careerId: tour.careerId || tour.career || null,
       youtubeUrl: youtubeUrl || null,  // ✅ AGREGAR ESTA LÍNEA
       kuulaUrl: tour.kuulaUrl || null,  // ✅ AGREGAR ESTA LÍNEA
+      thumbnailUrl: tour.thumbnailUrl || null,  // ✅ NUEVO: Imagen de Cloudinary
       multimedia: tour.multimedia || [],
       hotspots: tour.hotspots || [],
       arConfig: tour.arConfig || {},
@@ -320,6 +323,7 @@ app.get('/api/tours/:id', async (req, res) => {
     console.log(`✅ Tour encontrado: ${mapped.title}`);
     console.log(`📹 YouTube URL: ${mapped.youtubeUrl}`);  // ✅ Log para debugging
     console.log(`🥽 Kuula URL: ${mapped.kuulaUrl}`);  // ✅ Log para debugging
+    console.log(`🖼️ Thumbnail URL: ${mapped.thumbnailUrl}`);  // ✅ Log para debugging
     return res.json(mapped);
   } catch (err) {
     console.error('❌ Error en GET /api/tours/:id:', err);
