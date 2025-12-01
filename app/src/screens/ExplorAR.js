@@ -16,6 +16,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import YoutubePlayer from 'react-native-youtube-iframe';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import useAnalyticsStore from '../stores/analyticsStore';
@@ -276,15 +277,11 @@ const ExplorAR = ({ navigation, route }) => {
                             </div>
                           ) : (
                             <View style={styles.videoContainer}>
-                              <WebView
-                                source={{ uri: `https://www.youtube.com/embed/${youtubeId}?controls=1&modestbranding=1&rel=0` }}
-                                style={styles.videoWebView}
-                                allowsInlineMediaPlayback={true}
-                                mediaPlaybackRequiresUserAction={false}
-                                javaScriptEnabled={true}
-                                domStorageEnabled={true}
-                                startInLoadingState={true}
-                                renderLoading={() => <ActivityIndicator color={COLORS.primary} size="small" style={{position:'absolute', top: '45%', left: '45%'}} />}
+                              <YoutubePlayer
+                                height={220}
+                                play={false}
+                                videoId={youtubeId}
+                                webViewStyle={{ opacity: 0.99 }}
                               />
                             </View>
                           )
