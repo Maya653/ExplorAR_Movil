@@ -1,3 +1,4 @@
+// src/screens/ExplorAR.js - ACTUALIZADO CON COLORES INSTITUCIONALES CUORH
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -12,26 +13,58 @@ import {
   Linking,
   Platform,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
-import Constants from 'expo-constants';
 import { WebView } from 'react-native-webview';
+import YoutubePlayer from 'react-native-youtube-iframe';
+import { Ionicons, Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import useAnalyticsStore from '../stores/analyticsStore';
+import apiClient from '../api/apiClient';
+
+// ✅ COLORES PREMIUM (Azul y Dorado)
+const COLORS = {
+  primary: '#D4AF37',      // Dorado Premium
+  secondary: '#0A1A2F',    // Azul Oscuro Profundo
+  background: '#0A1A2F',   // Fondo Principal
+  card: '#112240',         // Fondo de Tarjetas
+  text: '#E6F1FF',         // Texto Principal (Blanco Azulado)
+  subtext: '#8892B0',      // Texto Secundario (Gris Azulado)
+  accent: '#64FFDA',       // Acento (Cyan Brillante para detalles)
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#EF4444',
+  border: 'rgba(212, 175, 55, 0.2)', // Borde dorado sutil
+};
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// ✅ CACHE EN MEMORIA (persiste durante la sesión)
+let testimoniosCache = null;
+let cacheTimestamp = null;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
 
 // Helpers
 const getYouTubeIdFromUrl = (url) => {
   if (!url || typeof url !== 'string') return null;
-  // varios formatos posibles
   const patterns = [
-    /v=([\w-]+)/, // watch?v=ID
-    /youtu\.be\/([\w-]+)/, // youtu.be/ID
-    /embed\/([\w-]+)/, // embed/ID
-    /youtube\.com\/v\/([\w-]+)/,
+    /[?&]v=([\w-]+)/,       // youtube.com/watch?v=ID
+    /youtu\.be\/([\w-]+)/,  // youtu.be/ID
+    /embed\/([\w-]+)/,      // youtube.com/embed/ID
+    /v\/([\w-]+)/,          // youtube.com/v/ID
+    /shorts\/([\w-]+)/,     // youtube.com/shorts/ID
   ];
   for (const p of patterns) {
     const m = url.match(p);
     if (m && m[1]) return m[1];
   }
   return null;
+};
+
+const isDirectVideo = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  const lower = url.toLowerCase();
+  return lower.includes('cloudinary') || lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.webm');
 };
 
 const openExternalUrl = async (url) => {
@@ -47,98 +80,113 @@ const openExternalUrl = async (url) => {
   }
 };
 
-const ExplorAR = ({ navigation }) => {
+const ExplorAR = ({ navigation, route }) => {
   const [testimonios, setTestimonios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const { trackScreenView } = useAnalyticsStore();
 
-
-  // Construir una lista de bases probables y una función que intente cada una hasta obtener datos
-  const LOCALHOST = 'http://localhost:5000';
-  const ANDROID_LOCALHOST = 'http://192.168.1.71:5000';
-  
-
-  const getLanApiBase = () => {
-    try {
-      const candidates = [
-        Constants?.manifest?.debuggerHost,
-        Constants?.manifest2?.extra?.expoClient?.hostUri,
-        Constants?.expoConfig?.hostUri,
-        Constants?.manifest?.hostUri,
-        Constants?.manifest2?.hostUri,
-      ];
-      for (const c of candidates) {
-        if (!c) continue;
-        const m = c.toString().match(/(\d+\.\d+\.\d+\.\d+)/);
-        if (m && m[1]) return `http://${m[1]}:5000`;
-      }
-    } catch (e) {
-      // ignore
-    }
-    return null;
-  };
-
-  const candidateBases = [];
-  const lanBase = getLanApiBase();
-  if (lanBase) candidateBases.push(lanBase);
-  // prefer localhost on iOS/web, and 10.0.2.2 on Android emulator
-  if (Platform.OS === 'android') candidateBases.push(ANDROID_LOCALHOST);
-  candidateBases.push(LOCALHOST);
-  // remove duplicates
-  const uniqueBases = Array.from(new Set(candidateBases));
-  // Elegir una única base para la API: lanBase si existe, sino 10.0.2.2 en Android o localhost en iOS/web
-  const API_BASE = React.useMemo(() => {
-    if (Platform.OS === 'android') return ANDROID_LOCALHOST;
-    if (lanBase) return lanBase;
-    return LOCALHOST;
-  }, [lanBase]);
-
   useEffect(() => {   
     trackScreenView('Testimonials');
-
-    const fetchTestimonios = async () => {
-      const url = `${API_BASE}/api/testimonios`;
-      try {
-        console.log('Fetch testimonios desde', url);
-        const res = await fetch(url);
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          console.log(`Recibidos ${data.length} testimonios`);
-          setTestimonios(data);
-        } else {
-          console.warn('Respuesta inesperada (no array):', data);
-          setTestimonios([]);
-        }
-      } catch (err) {
-        console.error('Error fetching testimonios:', err && err.message ? err.message : err);
-        setTestimonios([]);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchTestimonios();
-  }, [API_BASE]);
+  }, []);
+
+  // ✅ Detectar parámetro de navegación para abrir testimonio específico
+  useEffect(() => {
+    if (route.params?.testimonial) {
+      console.log('📌 Abriendo testimonio desde navegación:', route.params.testimonial.author);
+      setSelected(route.params.testimonial);
+      // Limpiar params para evitar que se reabra al volver
+      navigation.setParams({ testimonial: null });
+    }
+  }, [route.params?.testimonial]);
+
+  const fetchTestimonios = async () => {
+    // ✅ VERIFICAR CACHE PRIMERO
+    const now = Date.now();
+    if (testimoniosCache && cacheTimestamp && (now - cacheTimestamp) < CACHE_DURATION) {
+      console.log('📦 Usando testimonios en cache');
+      setTestimonios(testimoniosCache);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      console.log('📥 Cargando testimonios desde servidor...');
+      
+      // ✅ CONFIGURACIÓN OPTIMIZADA
+      const response = await apiClient.get('/api/testimonios', {
+        timeout: 60000,  // 60 segundos
+        retries: 2,      // Solo 2 reintentos (en vez de 3)
+      });
+      
+      if (response.data && Array.isArray(response.data)) {
+        console.log(`✅ ${response.data.length} testimonios cargados`);
+        
+        // ✅ GUARDAR EN CACHE
+        testimoniosCache = response.data;
+        cacheTimestamp = Date.now();
+        
+        setTestimonios(response.data);
+      } else {
+        console.warn('Respuesta inesperada:', response.data);
+        setTestimonios([]);
+      }
+    } catch (err) {
+      console.error('Error cargando testimonios:', err.message || err);
+      
+      // ✅ SI HAY CACHE, USARLO AUNQUE SEA ANTIGUO
+      if (testimoniosCache) {
+        console.log('⚠️ Usando cache antiguo debido al error');
+        setTestimonios(testimoniosCache);
+      } else {
+        setTestimonios([]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ FUNCIÓN PARA REFRESCAR MANUALMENTE
+  const handleRefresh = () => {
+    testimoniosCache = null;
+    cacheTimestamp = null;
+    setLoading(true);
+    fetchTestimonios();
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <View style={styles.header}>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.secondary} />
+      
+      {/* ✅ HEADER PREMIUM */}
+      <LinearGradient
+        colors={[COLORS.secondary, '#0F2A4A']}
+        style={styles.header}
+      >
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Image source={require('../../assets/flecha_retorno.png')} style={styles.backIcon} />
+          <Ionicons name="arrow-back" size={24} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Testimonios</Text>
-      </View>
+        {/* ✅ BOTÓN DE REFRESH */}
+        <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
+          <Ionicons name="refresh-outline" size={22} color={COLORS.primary} />
+        </TouchableOpacity>
+      </LinearGradient>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#4F46E5" style={{ marginTop: 24 }} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Cargando testimonios...</Text>
+        </View>
       ) : testimonios.length === 0 ? (
         <View style={styles.emptyBox}>
-          <Text style={styles.emptyTitle}>No hay testimonios</Text>
-          <Text style={styles.emptySubtitle}>Asegúrate de que el servidor esté corriendo y que la colección tenga documentos.</Text>
+          <Ionicons name="document-text-outline" size={64} color={COLORS.subtext} style={{ marginBottom: 20 }} />
+          <Text style={styles.emptyTitle}>No hay testimonios disponibles</Text>
+          <Text style={styles.emptySubtitle}>Intenta nuevamente más tarde</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+            <Text style={styles.retryButtonText}>Reintentar</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
@@ -157,12 +205,27 @@ const ExplorAR = ({ navigation }) => {
                 <Text style={styles.cardName}>{t.author || t.autor}</Text>
                 <Text style={styles.cardRole}>{t.role} • {t.year}</Text>
                 <Text style={styles.cardText} numberOfLines={3}>{t.text}</Text>
+                <View style={styles.indicatorsRow}>
+                  {((t._raw && (t._raw.transcript || t._raw.transcripcion)) || t.transcript) && (
+                    <View style={styles.indicator}>
+                      <Ionicons name="document-text-outline" size={12} color={COLORS.primary} style={{ marginRight: 4 }} />
+                      <Text style={styles.indicatorText}>Transcripción</Text>
+                    </View>
+                  )}
+                  {((t._raw && (t._raw.mediaUrl || t._raw.videoUrl)) || t.mediaUrl) && (
+                    <View style={styles.indicator}>
+                      <Ionicons name="videocam-outline" size={12} color={COLORS.primary} style={{ marginRight: 4 }} />
+                      <Text style={styles.indicatorText}>Video</Text>
+                    </View>
+                  )}
+                </View>
               </View>
             </TouchableOpacity>
           ))}
         </ScrollView>
       )}
 
+      {/* Modal sin cambios en lógica */}
       <Modal visible={!!selected} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -179,30 +242,34 @@ const ExplorAR = ({ navigation }) => {
               <View style={{ padding: 16 }}>
                 <Text style={styles.modalName}>{selected?.author || selected?.autor}</Text>
                 <Text style={styles.modalRole}>{selected?.role || selected?.authorRole} • {selected?.year || selected?.graduationYear}</Text>
-                <Text style={styles.modalText}>{selected?.text}</Text>
+                
+                <View style={styles.testimonioSection}>
+                  <Text style={styles.sectionTitle}>Testimonio</Text>
+                  <Text style={styles.modalText}>{selected?.text}</Text>
+                </View>
 
-                {/* Transcript (si existe) */}
                 {((selected?._raw && (selected._raw.transcript || selected._raw.transcripcion)) || selected?.transcript) ? (
-                  <>
-                    <Text style={styles.sectionTitleSmall}>Transcripción</Text>
+                  <View style={styles.testimonioSection}>
+                    <Text style={styles.sectionTitle}>Transcripción Completa</Text>
                     <Text style={styles.transcriptText}>{(selected._raw && (selected._raw.transcript || selected._raw.transcripcion)) || selected.transcript}</Text>
-                  </>
+                  </View>
                 ) : null}
 
-                {/* Media (video) */}
                 {((selected?._raw && (selected._raw.mediaUrl || selected._raw.videoUrl)) || selected?.mediaUrl) ? (
                   (() => {
                     const mediaUrl = (selected._raw && (selected._raw.mediaUrl || selected._raw.videoUrl)) || selected.mediaUrl;
                     const youtubeId = getYouTubeIdFromUrl(mediaUrl);
+                    const isVideo = isDirectVideo(mediaUrl);
+                    
                     return (
-                      <View style={styles.mediaBlock}>
-                        <Text style={styles.sectionTitleSmall}>Media</Text>
+                      <View style={styles.testimonioSection}>
+                        <Text style={styles.sectionTitle}>Video del Testimonio</Text>
                         {youtubeId ? (
                           Platform.OS === 'web' ? (
                             <div style={{ width: '100%', height: 220, borderRadius: 8, overflow: 'hidden', backgroundColor: '#000', marginBottom: 8 }}>
                               <iframe
                                 title={`youtube-${youtubeId}`}
-                                src={`https://www.youtube.com/embed/${youtubeId}?controls=1&modestbranding=1`}
+                                src={`https://www.youtube.com/embed/${youtubeId}?controls=1&modestbranding=1&rel=0`}
                                 style={{ width: '100%', height: '100%', border: 0 }}
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                 allowFullScreen
@@ -210,25 +277,107 @@ const ExplorAR = ({ navigation }) => {
                             </div>
                           ) : (
                             <View style={styles.videoContainer}>
-                              <WebView
-                                source={{ uri: `https://www.youtube.com/embed/${youtubeId}?controls=1&modestbranding=1` }}
-                                style={styles.videoWebView}
-                                allowsInlineMediaPlayback={true}
-                                mediaPlaybackRequiresUserAction={false}
+                              <YoutubePlayer
+                                height={220}
+                                play={false}
+                                videoId={youtubeId}
+                                webViewStyle={{ opacity: 0.99 }}
                               />
                             </View>
                           )
+                        ) : isVideo ? (
+                          <View style={styles.videoContainer}>
+                            <WebView
+                              source={{ 
+                                html: `
+                                  <html>
+                                    <head>
+                                      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                                      <style>
+                                        body { margin: 0; padding: 0; background-color: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+                                        video { width: 100%; height: 100%; object-fit: contain; }
+                                      </style>
+                                    </head>
+                                    <body>
+                                      <video controls playsinline poster="${selected.authorImage || ''}">
+                                        <source src="${mediaUrl}" type="video/mp4">
+                                        Tu dispositivo no soporta la reproducción de este video.
+                                      </video>
+                                    </body>
+                                  </html>
+                                `
+                              }}
+                              style={styles.videoWebView}
+                              allowsInlineMediaPlayback={true}
+                              mediaPlaybackRequiresUserAction={false}
+                              javaScriptEnabled={true}
+                              domStorageEnabled={true}
+                              startInLoadingState={true}
+                              renderLoading={() => <ActivityIndicator color={COLORS.primary} size="small" style={{position:'absolute', top: '45%', left: '45%'}} />}
+                            />
+                          </View>
                         ) : (
-                          <TouchableOpacity style={styles.openButton} onPress={() => openExternalUrl(mediaUrl)}>
-                            <Text style={styles.openButtonText}>Ver video</Text>
-                          </TouchableOpacity>
+                          <View>
+                            <TouchableOpacity style={styles.openButton} onPress={() => openExternalUrl(mediaUrl)}>
+                              <Text style={styles.openButtonText}>Ver video externo</Text>
+                            </TouchableOpacity>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+                              <Ionicons name="link-outline" size={14} color={COLORS.subtext} style={{ marginRight: 4 }} />
+                              <Text style={styles.mediaUrl}>{mediaUrl}</Text>
+                            </View>
+                          </View>
                         )}
-                        <Text style={styles.mediaUrl}>{mediaUrl}</Text>
                       </View>
                     );
                   })()
                 ) : null}
-                {/* Documento completo removido del modal según petición */}
+
+                {selected?._raw && (
+                  <View style={styles.testimonioSection}>
+                    <Text style={styles.sectionTitle}>Información Adicional</Text>
+                    <View style={styles.additionalInfo}>
+                      {selected._raw.email && (
+                        <View style={styles.infoRow}>
+                          <Ionicons name="mail-outline" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
+                          <Text style={styles.infoItem}>{selected._raw.email}</Text>
+                        </View>
+                      )}
+                      {selected._raw.phone && (
+                        <View style={styles.infoRow}>
+                          <Ionicons name="call-outline" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
+                          <Text style={styles.infoItem}>{selected._raw.phone}</Text>
+                        </View>
+                      )}
+                      {selected._raw.company && (
+                        <View style={styles.infoRow}>
+                          <Ionicons name="business-outline" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
+                          <Text style={styles.infoItem}>{selected._raw.company}</Text>
+                        </View>
+                      )}
+                      {selected._raw.location && (
+                        <View style={styles.infoRow}>
+                          <Ionicons name="location-outline" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
+                          <Text style={styles.infoItem}>{selected._raw.location}</Text>
+                        </View>
+                      )}
+                      {selected._raw.tags && Array.isArray(selected._raw.tags) && (
+                        <View style={styles.tagsContainer}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                            <Ionicons name="pricetag-outline" size={16} color={COLORS.subtext} style={{ marginRight: 6 }} />
+                            <Text style={styles.tagsLabel}>Tags:</Text>
+                          </View>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                            {selected._raw.tags.map((tag, index) => (
+                              <View key={index} style={styles.tag}>
+                                <Text style={styles.tagText}>{tag}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                )}
               </View>
             </ScrollView>
 
@@ -240,72 +389,354 @@ const ExplorAR = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3F4F6' },
-  header: { padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee', position: 'relative', alignItems: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: '#111827', textAlign: 'center' },
-  scroll: { padding: 16, paddingBottom: 40 },
-  card: { backgroundColor: '#fff', borderRadius: 12, overflow: 'hidden', marginBottom: 12, elevation: 2 },
-  cardImage: { width: '100%', height: 140 },
-  cardBody: { padding: 12 },
-  cardName: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 4 },
-  cardRole: { fontSize: 12, color: '#6B7280', marginBottom: 8 },
-  cardText: { fontSize: 13, color: '#374151' },
-  sectionTitleSmall: { fontSize: 14, fontWeight: '700', color: '#111827', marginTop: 12, marginBottom: 6 },
-  transcriptText: { fontSize: 13, color: '#374151', lineHeight: 18, backgroundColor: '#F9FAFB', padding: 8, borderRadius: 8 },
-  mediaBlock: { marginTop: 12 },
-  videoThumbWrap: { position: 'relative', width: '100%', height: 200, borderRadius: 8, overflow: 'hidden', marginBottom: 8 },
-  videoThumb: { width: '100%', height: '100%' },
-  playOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.25)' },
-  playIcon: { fontSize: 36, color: '#fff', fontWeight: '700' },
-  openButton: { backgroundColor: '#4F46E5', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
-  openButtonText: { color: '#fff', fontWeight: '700' },
-  mediaUrl: { fontSize: 12, color: '#6B7280', marginTop: 6 },
-  videoContainer: { width: '100%', height: 220, borderRadius: 8, overflow: 'hidden', backgroundColor: '#000', marginBottom: 8 },
-  videoWebView: { flex: 1, backgroundColor: '#000' },
-
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
-  modalCard: { width: '92%', maxHeight: '90%', backgroundColor: '#fff', borderRadius: 12, overflow: 'hidden' },
-  modalImage: { width: '100%', height: 220 },
-  modalName: { fontSize: 18, fontWeight: '700', color: '#111827' },
-  modalRole: { fontSize: 13, color: '#6B7280', marginBottom: 8 },
-  modalText: { fontSize: 14, color: '#374151', lineHeight: 20 },
-  jsonTitle: { fontSize: 12, color: '#6B7280', marginTop: 12, marginBottom: 4 },
-  jsonBlock: { fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }), fontSize: 12, color: '#111827', backgroundColor: '#F9FAFB', padding: 8, borderRadius: 8 },
-  modalFooter: { padding: 12, borderTopWidth: 1, borderTopColor: '#eee', alignItems: 'flex-end' },
-  closeButton: { backgroundColor: '#4F46E5', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
-  closeText: { color: '#fff', fontWeight: '700' },
-  backButton: { position: 'absolute', left: 12, top: 12, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  backIcon: { width: 18, height: 18, tintColor: '#111827' },
-  emptyBox: { padding: 24, alignItems: 'center' },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 6 },
-  emptySubtitle: { fontSize: 13, color: '#6B7280', textAlign: 'center' },
-  /* Estilos tipo HomeScreen para tarjetas horizontales */
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.background,
+  },
+  
+  // ✅ HEADER PREMIUM
+  header: { 
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 12 : 50,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  headerTitle: { 
+    fontSize: 22, 
+    fontWeight: '700', 
+    color: COLORS.primary,
+    flex: 1,
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  backButton: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center', 
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  
+  // ✅ LOADING
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 15,
+    color: COLORS.subtext,
+    fontWeight: '500',
+  },
+  
+  // ✅ CONTENT
+  scroll: { 
+    padding: 16, 
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  },
+  
+  // ✅ CARDS
   cardHorizontal: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 12,
-    padding: 12,
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    marginBottom: 16,
+    padding: 16,
     alignItems: 'center',
-    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   cardThumb: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    marginRight: 12,
+    width: 85,
+    height: 85,
+    borderRadius: 14,
+    marginRight: 16,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
   },
   cardInfo: {
     flex: 1,
   },
-  cardName: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 4 },
-  cardRole: { fontSize: 12, color: '#6B7280', marginBottom: 8 },
-  cardText: { fontSize: 13, color: '#374151' },
+  cardName: { 
+    fontSize: 16, 
+    fontWeight: '700', 
+    color: COLORS.text, 
+    marginBottom: 4,
+  },
+  cardRole: { 
+    fontSize: 12, 
+    color: COLORS.primary, 
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  cardText: { 
+    fontSize: 13, 
+    color: COLORS.subtext,
+    lineHeight: 18,
+  },
+  indicatorsRow: { 
+    flexDirection: 'row', 
+    marginTop: 12, 
+    flexWrap: 'wrap',
+  },
+  indicator: { 
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(212, 175, 55, 0.1)', 
+    paddingHorizontal: 10, 
+    paddingVertical: 6, 
+    borderRadius: 12, 
+    marginRight: 8, 
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.2)',
+  },
+  indicatorText: { 
+    fontSize: 10, 
+    color: COLORS.primary, 
+    fontWeight: '600',
+  },
+  
+  // ✅ EMPTY STATE
+  emptyBox: { 
+    flex: 1, 
+    padding: 32, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    backgroundColor: COLORS.background,
+  },
+  emptyTitle: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: COLORS.text, 
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: { 
+    fontSize: 14, 
+    color: COLORS.subtext, 
+    textAlign: 'center', 
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 8,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  retryButtonText: {
+    color: COLORS.background,
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  
+  // ✅ MODAL
+  videoContainer: { 
+    width: '100%', 
+    height: 220, 
+    borderRadius: 12, 
+    overflow: 'hidden', 
+    backgroundColor: '#000', 
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  videoWebView: { 
+    flex: 1, 
+    backgroundColor: '#000',
+  },
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(10, 26, 47, 0.9)', 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalCard: { 
+    width: '100%',
+    maxWidth: 500,
+    maxHeight: '90%', 
+    backgroundColor: COLORS.card, 
+    borderRadius: 20, 
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  modalImage: { 
+    width: '100%', 
+    height: 240,
+  },
+  modalName: { 
+    fontSize: 22, 
+    fontWeight: '700', 
+    color: COLORS.primary,
+    marginBottom: 4,
+  },
+  modalRole: { 
+    fontSize: 14, 
+    color: COLORS.subtext, 
+    marginBottom: 16,
+    fontWeight: '600',
+  },
+  modalText: { 
+    fontSize: 15, 
+    color: COLORS.text, 
+    lineHeight: 24,
+  },
+  modalFooter: { 
+    padding: 16, 
+    borderTopWidth: 1, 
+    borderTopColor: 'rgba(255, 255, 255, 0.05)', 
+    alignItems: 'flex-end',
+    backgroundColor: COLORS.card,
+  },
+  closeButton: { 
+    backgroundColor: 'rgba(255, 255, 255, 0.1)', 
+    paddingHorizontal: 24, 
+    paddingVertical: 12, 
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  closeText: { 
+    color: COLORS.text, 
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  
+  // ✅ TESTIMONIAL SECTIONS
+  testimonioSection: {
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: COLORS.primary,
+    paddingBottom: 6,
+    alignSelf: 'flex-start',
+  },
+  transcriptText: { 
+    fontSize: 14, 
+    color: COLORS.subtext, 
+    lineHeight: 22, 
+    backgroundColor: 'rgba(10, 26, 47, 0.5)', 
+    padding: 16, 
+    borderRadius: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
+  },
+  additionalInfo: {
+    backgroundColor: 'rgba(10, 26, 47, 0.5)',
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  infoItem: {
+    fontSize: 14,
+    color: COLORS.subtext,
+    lineHeight: 20,
+  },
+  tagsContainer: {
+    marginTop: 12,
+  },
+  tagsLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  tag: {
+    backgroundColor: 'rgba(212, 175, 55, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginRight: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.3)',
+  },
+  tagText: {
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  openButton: { 
+    backgroundColor: COLORS.primary, 
+    paddingHorizontal: 18, 
+    paddingVertical: 12, 
+    borderRadius: 10, 
+    alignItems: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  openButtonText: { 
+    color: COLORS.background, 
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  mediaUrl: { 
+    fontSize: 12, 
+    color: COLORS.accent, 
+    fontStyle: 'italic',
+    textDecorationLine: 'underline',
+  },
 });
 
 export default ExplorAR;

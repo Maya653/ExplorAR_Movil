@@ -10,23 +10,47 @@ const useTourStore = create((set, get) => ({
   isPlaying: false,
   loading: false,
   error: null,
+  lastFetch: null, // ✅ NUEVO: Timestamp del último fetch
 
   // Acciones
-  fetchTours: async () => {
-    set({ loading: true, error: null });
+  fetchTours: async (forceRefresh = false) => {
+    const state = get();
+    
+    // Cache check (5 segundos - optimizado para notificaciones rápidas)
+    const fiveSecondsAgo = Date.now() - 5 * 1000;
+    if (!forceRefresh && state.tours.length > 0 && state.lastFetch > fiveSecondsAgo) {
+      return;
+    }
+
+    // Solo mostrar loading si NO es un refresh silencioso (polling) o si no hay datos
+    if (!forceRefresh || state.tours.length === 0) {
+      set({ loading: true, error: null });
+    }
+
     try {
-      const response = await apiClient.get(ENDPOINTS.TOURS, { timeout: 30000 });
+      // ✅ Cache busting: Agregar timestamp para evitar caché del servidor/red
+      const url = forceRefresh 
+        ? `${ENDPOINTS.TOURS}?_t=${Date.now()}` 
+        : ENDPOINTS.TOURS;
+
+      const response = await apiClient.get(url, { timeout: 30000 });
       const data = Array.isArray(response.data) ? response.data : [];
       
-      console.log(`✅ ${data.length} tours cargados`);
-      set({ tours: data, loading: false });
+      // Optimización: Solo actualizar si hay cambios reales
+      if (JSON.stringify(state.tours) !== JSON.stringify(data)) {
+        console.log(`✅ ${data.length} tours cargados`);
+        set({ tours: data, loading: false, lastFetch: Date.now() });
+      } else {
+        set({ loading: false, lastFetch: Date.now() });
+      }
     } catch (error) {
       console.error('Error al cargar tours:', error);
-      set({ 
+      set((state) => ({ 
         error: error.message || 'Error al cargar tours',
         loading: false,
-        tours: [] 
-      });
+        // Mantener tours previos si falla la recarga
+        tours: state.tours.length > 0 ? state.tours : [] 
+      }));
     }
   },
 

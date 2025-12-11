@@ -9,23 +9,75 @@ const useCareerStore = create((set, get) => ({
   selectedCareer: null,
   loading: false,
   error: null,
+  lastFetch: null, // ✅ NUEVO: Timestamp del último fetch exitoso
 
   // Acciones
-  fetchCareers: async () => {
-    set({ loading: true, error: null });
+  fetchCareers: async (forceRefresh = false) => {
+    const state = get();
+    
+    // ✅ NUEVO: Cache inteligente - Si hay datos recientes, no recargar
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    if (!forceRefresh && state.careers.length > 0 && state.lastFetch > fiveMinutesAgo) {
+      console.log('📦 Usando carreras en cache (recientes)');
+      return;
+    }
+
+    // Solo poner loading en true si no es un refresh silencioso (polling)
+    // O si no tenemos datos. Si ya tenemos datos, mejor no mostrar spinner global si es posible evitarlo.
+    if (!forceRefresh || state.careers.length === 0) {
+        set({ loading: true, error: null });
+    }
+    
     try {
-      const response = await apiClient.get(ENDPOINTS.CARRERAS);
+      // console.log('📥 Cargando carreras desde el servidor...');
+      
+      // ✅ Cache busting: Agregar timestamp para evitar caché del servidor/red
+      const url = forceRefresh 
+        ? `${ENDPOINTS.CARRERAS}?_t=${Date.now()}` 
+        : ENDPOINTS.CARRERAS;
+
+      // ✅ NUEVO: Reintentos automáticos configurados en apiClient
+      const response = await apiClient.get(url, {
+        timeout: 90000, // 90 segundos (mejor para Railway)
+        retries: 3,     // 3 reintentos automáticos
+      });
+      
       const data = Array.isArray(response.data) ? response.data : [];
       
-      console.log(`✅ ${data.length} carreras cargadas`);
-      set({ careers: data, loading: false });
+      // Comparación profunda simple para evitar actualizaciones de estado innecesarias
+      if (JSON.stringify(state.careers) !== JSON.stringify(data)) {
+          console.log(`✅ ${data.length} carreras cargadas`);
+          set({ 
+            careers: data, 
+            loading: false,
+            error: null,
+            lastFetch: Date.now() // ✅ NUEVO: Guardar timestamp
+          });
+      } else {
+          set({ loading: false, error: null, lastFetch: Date.now() });
+      }
+      
     } catch (error) {
       console.error('Error al cargar carreras:', error);
+      
+      // ✅ NUEVO: Mensajes de error más amigables
+      const errorMessage = error.message.includes('timeout') 
+        ? 'El servidor está tardando. Intenta de nuevo.'
+        : error.message.includes('Network')
+        ? 'Sin conexión. Verifica tu internet.'
+        : error.message || 'Error al cargar carreras';
+      
       set({ 
-        error: error.message || 'Error al cargar carreras',
+        error: errorMessage,
         loading: false,
-        careers: [] 
+        // ✅ NUEVO: Mantener datos en cache si falló
+        careers: state.careers.length > 0 ? state.careers : []
       });
+      
+      // ✅ NUEVO: Log si estamos usando cache
+      if (state.careers.length > 0) {
+        console.log('⚠️ Usando datos en cache debido al error');
+      }
     }
   },
 
@@ -56,6 +108,17 @@ const useCareerStore = create((set, get) => ({
         category.includes(lowerQuery)
       );
     });
+  },
+
+  // ✅ NUEVO: Método para forzar recarga
+  forceRefresh: async () => {
+    console.log('🔄 Forzando recarga de carreras...');
+    await get().fetchCareers(true);
+  },
+
+  // ✅ NUEVO: Limpiar error
+  clearError: () => {
+    set({ error: null });
   },
 }));
 

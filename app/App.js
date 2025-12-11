@@ -1,8 +1,11 @@
-// App.js - ACTUALIZADO con ARViewerScreen
+// App.js - ACTUALIZADO
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, StatusBar, Image, AppState } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+
+// Suprimir warnings específicos de three.js
+import './src/utils/suppressWarnings';
 import { LinearGradient } from 'expo-linear-gradient';
 
 // Importar screens desde src/screens/
@@ -12,8 +15,14 @@ import Screen4 from './src/screens/Screen4';
 import HomeScreen from './src/screens/HomeScreen';
 import ExplorAR from './src/screens/ExplorAR';
 import CarreraScreen from './src/screens/CarreraScreen';
-import ARViewerScreen from './src/screens/ARViewerScreen'; // ✅ NUEVO
+import ARViewerScreen from './src/screens/ARViewerScreen';
+import VR360ViewerScreen from './src/screens/VR360ViewerScreen';
 import Guardados from './src/screens/Guardados';
+
+// ✅ PANTALLAS NUEVAS
+import NotificationsScreen from './src/screens/NotificationsScreen';
+import AllCareersScreen from './src/screens/AllCareersScreen';
+import TourHistoryScreen from './src/screens/TourHistoryScreen'; // ✅ AGREGAR ESTA LÍNEA
 
 // ✅ Importar TODOS los stores
 import useAnalyticsStore from './src/stores/analyticsStore';
@@ -62,15 +71,30 @@ const MainStack = () => {
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Carrera" component={CarreraScreen} />
       <Stack.Screen name="ExplorAR" component={ExplorAR} />
-  <Stack.Screen name="Guardados" component={Guardados} />
+      <Stack.Screen name="Guardados" component={Guardados} />
       
-      {/* ✅ NUEVA PANTALLA: ARViewerScreen */}
+      {/* ✅ NUEVAS PANTALLAS */}
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="AllCareers" component={AllCareersScreen} />
+      <Stack.Screen name="TourHistory" component={TourHistoryScreen} />
+      
+      {/* ✅ PANTALLA: ARViewerScreen - Para modelos 3D (GLB) */}
       <Stack.Screen 
         name="ARViewer" 
         component={ARViewerScreen}
         options={{
           headerShown: false,
-          gestureEnabled: false, // Evitar swipe para cerrar accidentalmente
+          gestureEnabled: false,
+        }}
+      />
+
+      {/* ✅ NUEVA PANTALLA: VR360ViewerScreen - Para videos/fotos 360° */}
+      <Stack.Screen 
+        name="VR360Viewer" 
+        component={VR360ViewerScreen}
+        options={{
+          headerShown: false,
+          gestureEnabled: false,
         }}
       />
     </Stack.Navigator>

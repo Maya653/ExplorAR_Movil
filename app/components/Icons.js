@@ -1,6 +1,6 @@
+// components/Icons.js
 import React from 'react';
-import { View } from 'react-native';
-import Svg, { Path, Circle, G } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 
 export const SearchIcon = ({ size = 20, color = '#6B7280' }) => (
   <Svg width={size} height={size} viewBox="0 0 20 20" fill="none">
@@ -101,4 +101,17 @@ export const StarIcon = ({ size = 16, color = '#FFD700' }) => (
       strokeLinejoin="round"
     />
   </Svg>
+);
+
+export const BackIcon = ({ size = 24, color = '#111827' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M19 12H5M5 12L12 19M5 12L12 5"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+
 );
